@@ -1,0 +1,67 @@
+@page "/setup"
+@rendermode InteractiveServer
+@inject FabrConfigService ConfigService
+@inject OpenCaddisConfigService OpenCaddisConfigService
+@inject AgentManagerService AgentManager
+@inject NavigationManager Navigation
+
+<PageTitle>Setup - OpenCaddis</PageTitle>
+
+<div class="container py-4 flex-grow-1 overflow-auto" style="max-width: 960px;">
+    <header class="mb-4">
+        <h1 class="h3 fw-semibold">OpenCaddis Setup</h1>
+        <p class="text-body-secondary">@(_isBootstrap ? "Configure your AI model connections to get started." : "Manage your AI model configuration.")</p>
+    </header>
+
+    <ul class="nav nav-tabs mb-4">
+        @foreach (var tab in _tabs)
+        {
+            <li class="nav-item">
+                <button class="nav-link @(tab.Id == _activeTabId ? "active" : "")"
+                        @onclick="() => _activeTabId = tab.Id">
+                    <i class="bi @tab.Icon me-1"></i>@tab.Label
+                </button>
+            </li>
+        }
+    </ul>
+
+    <div class="tab-content">
+        @if (_activeTabId == "model-config")
+        {
+            <ModelConfigTab OnConfigurationSaved="HandleConfigurationSaved" />
+        }
+        @if (_activeTabId == "agent-config")
+        {
+            <AgentConfigTab OnConfigurationSaved="HandleConfigurationSaved" />
+        }
+        @if (_activeTabId == "connections")
+        {
+            <ConnectionsTab />
+        }
+    </div>
+</div>
+
+@code {
+    private string _activeTabId = "model-config";
+    private bool _isBootstrap;
+
+    private readonly record struct TabDefinition(string Id, string Label, string Icon);
+
+    private static readonly TabDefinition[] _tabs =
+    [
+        new("model-config", "Model Configuration", "bi-diagram-3"),
+        new("agent-config", "Agent Configuration", "bi-robot"),
+        new("connections", "Connections", "bi-plug")
+    ];
+
+    protected override void OnInitialized()
+    {
+        _isBootstrap = !ConfigService.ConfigurationExists() && !OpenCaddisConfigService.ConfigurationExists();
+    }
+
+    private async Task HandleConfigurationSaved()
+    {
+        await AgentManager.ReloadAsync();
+        Navigation.NavigateTo("/", forceLoad: true);
+    }
+}

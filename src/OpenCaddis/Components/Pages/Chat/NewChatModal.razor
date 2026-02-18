@@ -1,0 +1,80 @@
+@using System.ComponentModel.DataAnnotations
+
+<div class="modal fade show d-block" tabindex="-1" role="dialog">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">New Chat</h5>
+                <button type="button" class="btn-close" @onclick="OnCancel"></button>
+            </div>
+            <EditForm Model="_model" OnValidSubmit="HandleSubmit" FormName="new-chat">
+                <DataAnnotationsValidator />
+                <div class="modal-body d-flex flex-column gap-3">
+                    <div>
+                        <label class="form-label">Agent Type</label>
+                        <InputSelect @bind-Value="_model.AgentType" class="form-select">
+                            @foreach (var type in AvailableAgentTypes)
+                            {
+                                <option value="@type">@type</option>
+                            }
+                        </InputSelect>
+                        <ValidationMessage For="() => _model.AgentType" />
+                    </div>
+                    <div>
+                        <label class="form-label">Name</label>
+                        <InputText @bind-Value="_model.Name" class="form-control" placeholder="e.g. my-assistant" />
+                        <ValidationMessage For="() => _model.Name" />
+                    </div>
+                    <div>
+                        <label class="form-label">System Prompt <span class="text-body-secondary fw-normal">(optional)</span></label>
+                        <InputTextArea @bind-Value="_model.SystemPrompt" class="form-control" rows="3"
+                                       placeholder="e.g. You are a helpful assistant." />
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" @onclick="OnCancel">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Create</button>
+                </div>
+            </EditForm>
+        </div>
+    </div>
+</div>
+<div class="modal-backdrop fade show"></div>
+
+@code {
+    [Parameter] public List<string> AvailableAgentTypes { get; set; } = [];
+    [Parameter] public EventCallback<NewChatRequest> OnCreate { get; set; }
+    [Parameter] public EventCallback OnCancel { get; set; }
+
+    private NewChatFormModel _model = new();
+
+    protected override void OnInitialized()
+    {
+        if (AvailableAgentTypes.Count > 0)
+        {
+            _model.AgentType = AvailableAgentTypes[0];
+        }
+    }
+
+    private async Task HandleSubmit()
+    {
+        await OnCreate.InvokeAsync(new NewChatRequest(_model.AgentType, _model.Name, _model.SystemPrompt ?? string.Empty));
+        _model = new NewChatFormModel
+        {
+            AgentType = AvailableAgentTypes.Count > 0 ? AvailableAgentTypes[0] : string.Empty
+        };
+    }
+
+    private sealed class NewChatFormModel
+    {
+        [Required]
+        public string AgentType { get; set; } = string.Empty;
+
+        [Required, StringLength(100, MinimumLength = 1)]
+        public string Name { get; set; } = string.Empty;
+
+        public string? SystemPrompt { get; set; }
+    }
+
+    public record NewChatRequest(string AgentType, string Name, string SystemPrompt);
+}

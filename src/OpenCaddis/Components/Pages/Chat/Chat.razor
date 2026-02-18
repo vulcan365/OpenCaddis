@@ -1,0 +1,361 @@
+@page "/chat"
+@rendermode InteractiveServer
+@inject IClientContextFactory ClientContextFactory
+@inject AgentDiscoveryService AgentDiscovery
+@inject CaddisFlyRuntimeService CaddisFlyRuntime
+@inject CommandExecutorFactory ExecutorFactory
+@inject IJSRuntime JS
+@implements IAsyncDisposable
+
+<PageTitle>Chat - OpenCaddis</PageTitle>
+
+<div class="chat-container">
+    @* Left sidebar *@
+    <div class="chat-sidebar">
+        <ConversationList Conversations="_conversations"
+                          SelectedConversation="_selectedConversation"
+                          IsLoading="_isLoadingConversations"
+                          OnConversationSelected="SelectConversation"
+                          OnRefresh="RefreshAgents" />
+    </div>
+
+    @* Right panel *@
+    <div class="chat-panel">
+        @if (_selectedConversation is not null)
+        {
+            <ChatWindow Conversation="_selectedConversation"
+                        Messages="_messages"
+                        ErrorMessage="@_errorMessage"
+                        OnSendMessage="SendMessage"
+                        OnApproval="HandleApproval" />
+        }
+        else
+        {
+            <div class="empty-state flex-grow-1">
+                <i class="bi bi-chat-dots"></i>
+                <p>Select an agent to start chatting.</p>
+            </div>
+        }
+    </div>
+</div>
+
+
+@code {
+    private const string UserHandle = "opencaddis-user";
+
+    private IClientContext? _context;
+    private IJSObjectReference? _jsModule;
+
+    private List<ChatAgent> _conversations = [];
+    private ChatAgent? _selectedConversation;
+    private readonly Dictionary<string, List<ChatMessage>> _messagesByAgent = new();
+    private List<ChatMessage> _messages = [];
+    private bool _isLoadingConversations = true;
+    private string? _errorMessage;
+    private bool _shouldScrollToBottom;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _context = await ClientContextFactory.GetOrCreateAsync(UserHandle);
+        _context.AgentMessageReceived += OnAgentMessageReceived;
+
+        try
+        {
+            _conversations = await AgentDiscovery.GetAllAgentsAsync();
+        }
+        catch
+        {
+            // No agents yet - that's fine
+        }
+        finally
+        {
+            _isLoadingConversations = false;
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            _jsModule = await JS.InvokeAsync<IJSObjectReference>("import",
+                "./Components/Pages/Chat/Chat.razor.js");
+        }
+
+        if (_shouldScrollToBottom && _jsModule is not null)
+        {
+            _shouldScrollToBottom = false;
+            await _jsModule.InvokeVoidAsync("scrollToBottom", "chat-messages");
+        }
+    }
+
+    private async Task RefreshAgents()
+    {
+        _isLoadingConversations = true;
+        try
+        {
+            _conversations = await AgentDiscovery.GetAllAgentsAsync();
+
+            // If the selected conversation is no longer in the list, deselect
+            if (_selectedConversation is not null &&
+                !_conversations.Any(c => c.Handle == _selectedConversation.Handle))
+            {
+                _selectedConversation = null;
+                _messages = [];
+            }
+        }
+        catch
+        {
+            // Keep existing list on failure
+        }
+        finally
+        {
+            _isLoadingConversations = false;
+        }
+    }
+
+    private void SelectConversation(ChatAgent conversation)
+    {
+        _selectedConversation = conversation;
+        _errorMessage = null;
+
+        if (!_messagesByAgent.TryGetValue(conversation.Handle, out var messages))
+        {
+            messages = [];
+            _messagesByAgent[conversation.Handle] = messages;
+        }
+        _messages = messages;
+        _shouldScrollToBottom = true;
+    }
+
+    private async Task SendMessage(string text)
+    {
+        if (_context is null || _selectedConversation is null) return;
+
+        _errorMessage = null;
+
+        var userMessage = new ChatMessage
+        {
+            Content = text,
+            IsFromUser = true,
+            Timestamp = DateTimeOffset.Now,
+            Status = ChatMessageStatus.Complete
+        };
+        _messages.Add(userMessage);
+        _shouldScrollToBottom = true;
+
+        try
+        {
+            await _context.SendMessage(new AgentMessage
+            {
+                FromHandle = UserHandle,
+                ToHandle = _selectedConversation.Handle,
+                Message = text,
+                Kind = MessageKind.Request
+            });
+
+            // Add a thinking placeholder — the response will arrive via OnAgentMessageReceived
+            _messages.Add(new ChatMessage
+            {
+                Content = "Thinking...",
+                IsFromUser = false,
+                Timestamp = DateTimeOffset.Now,
+                Status = ChatMessageStatus.Thinking
+            });
+        }
+        catch (Exception ex)
+        {
+            _messages.Add(new ChatMessage
+            {
+                Content = ex.Message,
+                IsFromUser = false,
+                Timestamp = DateTimeOffset.Now,
+                Status = ChatMessageStatus.Error
+            });
+        }
+        finally
+        {
+            _shouldScrollToBottom = true;
+        }
+    }
+
+    private void OnAgentMessageReceived(object? sender, AgentMessage message)
+    {
+        InvokeAsync(() =>
+        {
+            var fromHandle = message.FromHandle;
+            if (fromHandle is null) return;
+
+            // Find the message list for the agent that sent this message
+            // by matching against known agent handles in _messagesByAgent
+            List<ChatMessage>? agentMessages = null;
+            string? matchedHandle = null;
+            foreach (var kvp in _messagesByAgent)
+            {
+                if (fromHandle.Contains(kvp.Key))
+                {
+                    agentMessages = kvp.Value;
+                    matchedHandle = kvp.Key;
+                    break;
+                }
+            }
+
+            // If we don't have a message list for this agent, ignore
+            if (agentMessages is null) return;
+
+            var thinking = agentMessages.FirstOrDefault(m => !m.IsFromUser && m.Status == ChatMessageStatus.Thinking);
+
+            if (message.MessageType == "caddisfly-approval")
+            {
+                // Remove thinking placeholder if present
+                if (thinking is not null)
+                    agentMessages.Remove(thinking);
+
+                var args = message.Args ?? new Dictionary<string, string>();
+                args.TryGetValue("resumeToken", out var token);
+                args.TryGetValue("approvalPrompt", out var prompt);
+                args.TryGetValue("pipelineName", out var pipelineName);
+                args.TryGetValue("stepIndex", out var stepIndexStr);
+                args.TryGetValue("totalSteps", out var totalStepsStr);
+                int.TryParse(stepIndexStr, out var stepIndex);
+                int.TryParse(totalStepsStr, out var totalSteps);
+
+                agentMessages.Add(new ChatMessage
+                {
+                    Content = prompt ?? "Approval required to continue.",
+                    IsFromUser = false,
+                    Timestamp = DateTimeOffset.Now,
+                    Status = ChatMessageStatus.ApprovalPending,
+                    ApprovalInfo = new CaddisFlyApprovalInfo
+                    {
+                        ResumeToken = token ?? "",
+                        Prompt = prompt ?? "Approval required to continue.",
+                        PipelineName = pipelineName ?? "unknown",
+                        StepIndex = stepIndex,
+                        TotalSteps = totalSteps
+                    }
+                });
+            }
+            else if (message.MessageType == "thinking")
+            {
+                if (thinking is not null)
+                {
+                    thinking.Content = message.Message ?? "Thinking...";
+                }
+                else
+                {
+                    agentMessages.Add(new ChatMessage
+                    {
+                        Content = message.Message ?? "Thinking...",
+                        IsFromUser = false,
+                        Timestamp = DateTimeOffset.Now,
+                        Status = ChatMessageStatus.Thinking
+                    });
+                }
+            }
+            else
+            {
+                if (thinking is not null)
+                {
+                    thinking.Content = message.Message ?? "No response";
+                    thinking.Status = ChatMessageStatus.Complete;
+                }
+                else
+                {
+                    agentMessages.Add(new ChatMessage
+                    {
+                        Content = message.Message ?? "No response",
+                        IsFromUser = false,
+                        Timestamp = DateTimeOffset.Now,
+                        Status = ChatMessageStatus.Complete
+                    });
+                }
+            }
+
+            // Only re-render if this message is for the currently viewed agent
+            if (_selectedConversation is not null && matchedHandle == _selectedConversation.Handle)
+            {
+                _shouldScrollToBottom = true;
+                StateHasChanged();
+            }
+        });
+    }
+
+    private async Task HandleApproval((ChatMessage Message, bool Approved) args)
+    {
+        var (message, approved) = args;
+        if (message.ApprovalInfo is null) return;
+
+        message.ApprovalInfo.Result = approved ? ApprovalResult.Approved : ApprovalResult.Denied;
+        message.Status = ChatMessageStatus.Complete;
+        StateHasChanged();
+
+        var executor = ExecutorFactory.GetExecutor();
+        if (executor is null)
+        {
+            _messages.Add(new ChatMessage
+            {
+                Content = "Unable to resume pipeline: executor not available.",
+                IsFromUser = false,
+                Timestamp = DateTimeOffset.Now,
+                Status = ChatMessageStatus.Error
+            });
+            return;
+        }
+
+        try
+        {
+            var envelope = await CaddisFlyRuntime.ResumeRunAsync(
+                message.ApprovalInfo.ResumeToken, approved, executor);
+
+            var statusText = envelope.Status switch
+            {
+                OpenCaddis.Agentic.CaddisFly.CaddisFlyStatus.Ok => "Pipeline completed successfully.",
+                OpenCaddis.Agentic.CaddisFly.CaddisFlyStatus.Cancelled => "Pipeline was cancelled.",
+                OpenCaddis.Agentic.CaddisFly.CaddisFlyStatus.Error => $"Pipeline failed: {envelope.Error}",
+                OpenCaddis.Agentic.CaddisFly.CaddisFlyStatus.NeedsApproval => "Pipeline paused at another approval gate.",
+                _ => $"Pipeline status: {envelope.Status}"
+            };
+
+            _messages.Add(new ChatMessage
+            {
+                Content = statusText,
+                IsFromUser = false,
+                Timestamp = DateTimeOffset.Now,
+                Status = ChatMessageStatus.Complete
+            });
+        }
+        catch (Exception ex)
+        {
+            _messages.Add(new ChatMessage
+            {
+                Content = $"Failed to resume pipeline: {ex.Message}",
+                IsFromUser = false,
+                Timestamp = DateTimeOffset.Now,
+                Status = ChatMessageStatus.Error
+            });
+        }
+
+        _shouldScrollToBottom = true;
+        StateHasChanged();
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_context is not null)
+        {
+            _context.AgentMessageReceived -= OnAgentMessageReceived;
+        }
+
+        if (_jsModule is not null)
+        {
+            try
+            {
+                await _jsModule.DisposeAsync();
+            }
+            catch (JSDisconnectedException)
+            {
+                // Circuit already disconnected
+            }
+        }
+    }
+}

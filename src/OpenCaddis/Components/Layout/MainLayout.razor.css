@@ -1,0 +1,227 @@
+/* === App Root === */
+.app-root {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    overflow: hidden;
+}
+
+/* === Header === */
+.app-header {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0 1rem;
+    height: 52px;
+    background-color: var(--oc-bg-surface);
+    border-bottom: 1px solid var(--oc-border);
+}
+
+.sidebar-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    padding: 0;
+    border: none;
+    border-radius: var(--oc-radius-sm);
+    background: transparent;
+    color: var(--oc-text-secondary);
+    cursor: pointer;
+    transition: background-color var(--oc-transition-fast), color var(--oc-transition-fast);
+}
+
+.sidebar-toggle:hover {
+    background-color: var(--oc-bg-raised);
+    color: var(--oc-text-primary);
+}
+
+.brand-link {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    text-decoration: none;
+    color: var(--oc-text-primary);
+}
+
+.brand-link:hover {
+    color: var(--oc-text-primary);
+}
+
+.brand-icon {
+    font-size: 1.25rem;
+    color: var(--oc-accent);
+}
+
+.brand-text {
+    font-weight: 700;
+    font-size: 0.95rem;
+    letter-spacing: 0.02em;
+}
+
+/* === Header Links === */
+.header-links {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    margin-left: auto;
+}
+
+.header-icon-link {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    border-radius: var(--oc-radius-sm);
+    color: var(--oc-text-secondary);
+    text-decoration: none;
+    font-size: 1.1rem;
+    transition: background-color var(--oc-transition-fast), color var(--oc-transition-fast);
+}
+
+.header-icon-link:hover {
+    background-color: var(--oc-bg-raised);
+    color: var(--oc-text-primary);
+}
+
+/* === Body === */
+.app-body {
+    display: flex;
+    flex: 1 1 0;
+    min-height: 0;
+    overflow: hidden;
+}
+
+/* === Sidebar === */
+.app-sidebar {
+    display: flex;
+    flex-direction: column;
+    flex: 0 0 var(--oc-sidebar-expanded);
+    width: var(--oc-sidebar-expanded);
+    background-color: var(--oc-bg-deepest);
+    border-right: 1px solid var(--oc-border);
+    overflow: hidden;
+    transition: flex-basis var(--oc-transition-slow), width var(--oc-transition-slow);
+}
+
+.sidebar-nav-main {
+    flex: 1 1 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 0.5rem;
+    overflow-y: auto;
+}
+
+.sidebar-nav-bottom {
+    flex: 0 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 0.5rem;
+    border-top: 1px solid var(--oc-border);
+}
+
+/* === Sidebar Link === */
+::deep .sidebar-link {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.55rem 0.75rem;
+    border-radius: var(--oc-radius-sm);
+    color: var(--oc-text-secondary);
+    text-decoration: none;
+    font-size: 0.875rem;
+    font-weight: 500;
+    position: relative;
+    white-space: nowrap;
+    transition: background-color var(--oc-transition-fast), color var(--oc-transition-fast);
+}
+
+::deep .sidebar-link i {
+    font-size: 1.1rem;
+    flex-shrink: 0;
+    width: 1.25rem;
+    text-align: center;
+}
+
+::deep .sidebar-link:hover {
+    background-color: var(--oc-bg-raised);
+    color: var(--oc-text-primary);
+}
+
+::deep .sidebar-link.active {
+    background-color: var(--oc-accent-subtle);
+    color: var(--oc-accent);
+}
+
+::deep .sidebar-link.active::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0.35rem;
+    bottom: 0.35rem;
+    width: 3px;
+    border-radius: 0 2px 2px 0;
+    background-color: var(--oc-accent);
+}
+
+/* === Sidebar Label === */
+::deep .sidebar-label {
+    opacity: 1;
+    transition: opacity var(--oc-transition-med);
+}
+
+/* === Collapsed State === */
+.sidebar-collapsed .app-sidebar {
+    flex-basis: var(--oc-sidebar-collapsed);
+    width: var(--oc-sidebar-collapsed);
+}
+
+.sidebar-collapsed ::deep .sidebar-label {
+    opacity: 0;
+    pointer-events: none;
+}
+
+.sidebar-collapsed ::deep .sidebar-link {
+    justify-content: center;
+    padding-left: 0;
+    padding-right: 0;
+}
+
+/* === Content === */
+.app-content {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 0;
+    min-width: 0;
+    min-height: 0;
+    overflow: hidden;
+    background-color: var(--oc-bg-base);
+}
+
+/* === Blazor Error UI === */
+#blazor-error-ui {
+    background: var(--oc-bg-raised);
+    color: var(--oc-text-primary);
+    border-top: 2px solid #f85149;
+    bottom: 0;
+    box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.4);
+    box-sizing: border-box;
+    display: none;
+    left: 0;
+    padding: 0.6rem 1.25rem 0.7rem 1.25rem;
+    position: fixed;
+    width: 100%;
+    z-index: 1000;
+}
+
+#blazor-error-ui .dismiss {
+    cursor: pointer;
+    position: absolute;
+    right: 0.75rem;
+    top: 0.5rem;
+}

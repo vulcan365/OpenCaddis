@@ -1,0 +1,658 @@
+@using OpenCaddis.Services
+@inject OpenCaddisConfigService ConfigService
+@inject FabrConfigService FabrConfigService
+@inject IFabrRegistry FabrRegistry
+@inject IJSRuntime JS
+
+<div class="d-flex flex-column gap-4">
+    @* === Import / Export === *@
+    <div class="d-flex gap-2 justify-content-end">
+        <button class="btn btn-outline-secondary btn-sm" @onclick="ExportConfig" disabled="@(!_agents.Any())">
+            <i class="bi bi-download me-1"></i> Export
+        </button>
+        <label class="btn btn-outline-secondary btn-sm mb-0 position-relative">
+            <i class="bi bi-upload me-1"></i> Import
+            <InputFile OnChange="ImportConfig" accept=".json" class="position-absolute top-0 start-0 w-100 h-100 opacity-0" style="cursor: pointer;" />
+        </label>
+    </div>
+
+    @* === Agents Section === *@
+    <section>
+        <h5 class="fw-semibold mb-3">Agents</h5>
+
+        @if (_agents.Count == 0 && _editingAgent is null)
+        {
+            <div class="empty-state border border-dashed rounded">
+                <i class="bi bi-robot"></i>
+                <p>No agents configured. Add one to get started.</p>
+            </div>
+        }
+
+        @foreach (var agent in _agents)
+        {
+            @if (_editingAgent is not null && _editingAgentOriginalHandle == agent.Handle)
+            {
+                @RenderAgentEditForm()
+            }
+            else
+            {
+                <div class="card mb-2">
+                    <div class="card-body d-flex justify-content-between align-items-start py-2">
+                        <div>
+                            <div class="d-flex align-items-center gap-2 mb-1">
+                                <span class="fw-medium">@agent.Handle</span>
+                                <span class="badge bg-primary">@agent.AgentType</span>
+                                @if (!string.IsNullOrEmpty(agent.Models))
+                                {
+                                    <span class="badge bg-secondary">@agent.Models</span>
+                                }
+                            </div>
+                            <div class="d-flex flex-wrap gap-3 text-body-secondary small">
+                                @if (!string.IsNullOrEmpty(agent.Description))
+                                {
+                                    <span><strong>Description:</strong> @Truncate(agent.Description, 80)</span>
+                                }
+                                @if (!string.IsNullOrEmpty(agent.SystemPrompt))
+                                {
+                                    <span><strong>Prompt:</strong> @Truncate(agent.SystemPrompt, 60)</span>
+                                }
+                                @if (agent.Args.Count > 0)
+                                {
+                                    <span><strong>Args:</strong> @agent.Args.Count</span>
+                                }
+                                @if (agent.Plugins.Count > 0)
+                                {
+                                    <span><strong>Plugins:</strong> @agent.Plugins.Count</span>
+                                }
+                                @if (agent.Tools.Count > 0)
+                                {
+                                    <span><strong>Tools:</strong> @agent.Tools.Count</span>
+                                }
+                            </div>
+                        </div>
+                        <div class="d-flex gap-1 flex-shrink-0">
+                            <button class="btn btn-outline-secondary btn-sm" @onclick="() => EditAgent(agent)" disabled="@IsEditing">
+                                <i class="bi bi-pencil"></i>
+                            </button>
+                            <button class="btn btn-outline-danger btn-sm" @onclick="() => DeleteAgent(agent)" disabled="@IsEditing">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            }
+        }
+
+        @if (_editingAgent is not null && _editingAgentOriginalHandle is null)
+        {
+            @RenderAgentEditForm()
+        }
+
+        <button class="btn btn-outline-secondary mt-2" @onclick="AddAgent" disabled="@IsEditing">
+            <i class="bi bi-plus-lg me-1"></i> Add Agent
+        </button>
+    </section>
+
+    @* === Save Button === *@
+    <div class="d-flex justify-content-end pt-3 border-top">
+        <button class="btn btn-primary" @onclick="SaveConfiguration" disabled="@IsEditing">
+            <i class="bi bi-save me-1"></i> Save Configuration
+        </button>
+    </div>
+</div>
+
+@code {
+    [Parameter]
+    public EventCallback OnConfigurationSaved { get; set; }
+
+    private List<AgentConfigurationDto> _agents = [];
+    private List<string> _modelConfigNames = [];
+    private List<RegistryEntry> _agentTypes = [];
+    private List<RegistryEntry> _plugins = [];
+    private List<RegistryEntry> _tools = [];
+
+    // Editing state
+    private AgentConfigurationDto? _editingAgent;
+    private string? _editingAgentOriginalHandle;
+
+    // Temp collections for the edit form
+    private Dictionary<string, Dictionary<string, string>> _pluginArgValues = new(StringComparer.OrdinalIgnoreCase);
+    private List<KeyValuePair<string, string>> _editingExtraArgs = [];
+    private List<string> _editingPlugins = [];
+    private List<string> _editingTools = [];
+
+    private bool IsEditing => _editingAgent is not null;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (ConfigService.ConfigurationExists())
+        {
+            var config = await ConfigService.LoadConfigurationAsync();
+            _agents = config.Agents;
+        }
+
+        await LoadModelConfigNames();
+
+        _agentTypes = FabrRegistry.GetAgentTypes();
+        _plugins = FabrRegistry.GetPlugins();
+        _tools = FabrRegistry.GetTools();
+    }
+
+    private async Task LoadModelConfigNames()
+    {
+        if (FabrConfigService.ConfigurationExists())
+        {
+            var fabrConfig = await FabrConfigService.LoadConfigurationAsync();
+            _modelConfigNames = fabrConfig.ModelConfigurations.Select(m => m.Name).ToList();
+        }
+    }
+
+    // === Agent CRUD ===
+
+    private void AddAgent()
+    {
+        _editingAgent = new AgentConfigurationDto();
+        _editingAgentOriginalHandle = null;
+        _pluginArgValues = new(StringComparer.OrdinalIgnoreCase);
+        _editingExtraArgs = [];
+        _editingPlugins = [];
+        _editingTools = [];
+    }
+
+    private void EditAgent(AgentConfigurationDto agent)
+    {
+        _editingAgent = new AgentConfigurationDto
+        {
+            Handle = agent.Handle,
+            AgentType = agent.AgentType,
+            Models = agent.Models,
+            Description = agent.Description,
+            SystemPrompt = agent.SystemPrompt,
+            Args = new Dictionary<string, string>(agent.Args),
+            Plugins = new List<string>(agent.Plugins),
+            Tools = new List<string>(agent.Tools)
+        };
+        _editingAgentOriginalHandle = agent.Handle;
+        _editingPlugins = new List<string>(_editingAgent.Plugins);
+        _editingTools = new List<string>(_editingAgent.Tools);
+
+        // Parse flat Args into plugin args vs extra args
+        _pluginArgValues = new(StringComparer.OrdinalIgnoreCase);
+        _editingExtraArgs = [];
+
+        foreach (var kv in _editingAgent.Args)
+        {
+            var colonIdx = kv.Key.IndexOf(':');
+            if (colonIdx > 0)
+            {
+                var pluginAlias = kv.Key[..colonIdx];
+                var settingKey = kv.Key[(colonIdx + 1)..];
+                if (!_pluginArgValues.ContainsKey(pluginAlias))
+                    _pluginArgValues[pluginAlias] = new(StringComparer.OrdinalIgnoreCase);
+                _pluginArgValues[pluginAlias][settingKey] = kv.Value;
+            }
+            else
+            {
+                _editingExtraArgs.Add(kv);
+            }
+        }
+
+        // Ensure all active plugins have their registry defaults populated
+        foreach (var plugin in _editingPlugins)
+        {
+            EnsurePluginSettingsPopulated(plugin);
+        }
+    }
+
+    private void SaveAgent()
+    {
+        if (_editingAgent is null) return;
+
+        // Flatten plugin args back into Args dictionary
+        var args = new Dictionary<string, string>();
+
+        foreach (var (pluginAlias, settings) in _pluginArgValues)
+        {
+            // Only include settings for plugins that are still active
+            if (!_editingPlugins.Contains(pluginAlias, StringComparer.OrdinalIgnoreCase))
+                continue;
+
+            foreach (var (key, value) in settings)
+            {
+                if (!string.IsNullOrWhiteSpace(value))
+                    args[$"{pluginAlias}:{key}"] = value;
+            }
+        }
+
+        // Merge in extra args
+        foreach (var kv in _editingExtraArgs)
+        {
+            if (!string.IsNullOrWhiteSpace(kv.Key))
+                args[kv.Key] = kv.Value;
+        }
+
+        _editingAgent.Args = args;
+        _editingAgent.Plugins = _editingPlugins.Where(p => !string.IsNullOrWhiteSpace(p)).ToList();
+        _editingAgent.Tools = _editingTools.Where(t => !string.IsNullOrWhiteSpace(t)).ToList();
+
+        if (_editingAgentOriginalHandle is not null)
+        {
+            var existing = _agents.First(a => a.Handle == _editingAgentOriginalHandle);
+            existing.Handle = _editingAgent.Handle;
+            existing.AgentType = _editingAgent.AgentType;
+            existing.Models = _editingAgent.Models;
+            existing.Description = _editingAgent.Description;
+            existing.SystemPrompt = _editingAgent.SystemPrompt;
+            existing.Args = _editingAgent.Args;
+            existing.Plugins = _editingAgent.Plugins;
+            existing.Tools = _editingAgent.Tools;
+        }
+        else
+        {
+            _agents.Add(new AgentConfigurationDto
+            {
+                Handle = _editingAgent.Handle,
+                AgentType = _editingAgent.AgentType,
+                Models = _editingAgent.Models,
+                Description = _editingAgent.Description,
+                SystemPrompt = _editingAgent.SystemPrompt,
+                Args = _editingAgent.Args,
+                Plugins = _editingAgent.Plugins,
+                Tools = _editingAgent.Tools
+            });
+        }
+
+        _editingAgent = null;
+        _editingAgentOriginalHandle = null;
+    }
+
+    private void CancelAgentEdit()
+    {
+        _editingAgent = null;
+        _editingAgentOriginalHandle = null;
+    }
+
+    private void DeleteAgent(AgentConfigurationDto agent)
+    {
+        _agents.Remove(agent);
+    }
+
+    // === Plugin settings helpers ===
+
+    private void EnsurePluginSettingsPopulated(string pluginAlias)
+    {
+        if (!_pluginArgValues.ContainsKey(pluginAlias))
+            _pluginArgValues[pluginAlias] = new(StringComparer.OrdinalIgnoreCase);
+
+        var defs = PluginSettingsRegistry.GetSettings(pluginAlias);
+        foreach (var def in defs)
+        {
+            if (!_pluginArgValues[pluginAlias].ContainsKey(def.Key))
+                _pluginArgValues[pluginAlias][def.Key] = def.DefaultValue;
+        }
+    }
+
+    private void UpdatePluginSetting(string pluginAlias, string key, string value)
+    {
+        if (_pluginArgValues.TryGetValue(pluginAlias, out var settings))
+            settings[key] = value;
+    }
+
+    private void UpdatePluginBoolSetting(string pluginAlias, string key, ChangeEventArgs e)
+    {
+        var isChecked = (bool)(e.Value ?? false);
+        UpdatePluginSetting(pluginAlias, key, isChecked ? "true" : "false");
+    }
+
+    private string GetPluginSettingValue(string pluginAlias, string key)
+    {
+        if (_pluginArgValues.TryGetValue(pluginAlias, out var settings) && settings.TryGetValue(key, out var val))
+            return val;
+        return string.Empty;
+    }
+
+    // === Extra args helpers ===
+
+    private void AddExtraArgRow()
+    {
+        _editingExtraArgs.Add(new KeyValuePair<string, string>(string.Empty, string.Empty));
+    }
+
+    private void RemoveExtraArgRow(int index)
+    {
+        if (index >= 0 && index < _editingExtraArgs.Count)
+            _editingExtraArgs.RemoveAt(index);
+    }
+
+    private void UpdateExtraArgKey(int index, string key)
+    {
+        if (index >= 0 && index < _editingExtraArgs.Count)
+            _editingExtraArgs[index] = new KeyValuePair<string, string>(key, _editingExtraArgs[index].Value);
+    }
+
+    private void UpdateExtraArgValue(int index, string value)
+    {
+        if (index >= 0 && index < _editingExtraArgs.Count)
+            _editingExtraArgs[index] = new KeyValuePair<string, string>(_editingExtraArgs[index].Key, value);
+    }
+
+    // === Plugin helpers ===
+
+    private IEnumerable<string> GetAvailablePlugins()
+    {
+        return _plugins
+            .SelectMany(e => e.Aliases)
+            .Where(a => !_editingPlugins.Contains(a, StringComparer.OrdinalIgnoreCase));
+    }
+
+    private void OnPluginSelected(ChangeEventArgs e)
+    {
+        var value = e.Value?.ToString();
+        if (!string.IsNullOrWhiteSpace(value) && !_editingPlugins.Contains(value, StringComparer.OrdinalIgnoreCase))
+        {
+            _editingPlugins.Add(value);
+            EnsurePluginSettingsPopulated(value);
+        }
+    }
+
+    private void RemovePlugin(int index)
+    {
+        if (index >= 0 && index < _editingPlugins.Count)
+        {
+            var alias = _editingPlugins[index];
+            _editingPlugins.RemoveAt(index);
+            _pluginArgValues.Remove(alias);
+        }
+    }
+
+    // === Tool helpers ===
+
+    private IEnumerable<string> GetAvailableTools()
+    {
+        return _tools
+            .SelectMany(e => e.Aliases)
+            .Where(a => !_editingTools.Contains(a, StringComparer.OrdinalIgnoreCase));
+    }
+
+    private void OnToolSelected(ChangeEventArgs e)
+    {
+        var value = e.Value?.ToString();
+        if (!string.IsNullOrWhiteSpace(value) && !_editingTools.Contains(value, StringComparer.OrdinalIgnoreCase))
+        {
+            _editingTools.Add(value);
+        }
+    }
+
+    private void RemoveTool(int index)
+    {
+        if (index >= 0 && index < _editingTools.Count)
+            _editingTools.RemoveAt(index);
+    }
+
+    // === Save ===
+
+    private async Task SaveConfiguration()
+    {
+        var config = ConfigService.ConfigurationExists()
+            ? await ConfigService.LoadConfigurationAsync()
+            : new OpenCaddisConfigurationDto();
+
+        config.Agents = _agents;
+
+        await ConfigService.SaveConfigurationAsync(config);
+        await OnConfigurationSaved.InvokeAsync();
+    }
+
+    // === Import / Export ===
+
+    private async Task ExportConfig()
+    {
+        var config = new OpenCaddisConfigurationDto
+        {
+            Agents = _agents
+        };
+
+        var json = System.Text.Json.JsonSerializer.Serialize(config, new System.Text.Json.JsonSerializerOptions { WriteIndented = true });
+        var bytes = System.Text.Encoding.UTF8.GetBytes(json);
+        var base64 = Convert.ToBase64String(bytes);
+
+        await JS.InvokeVoidAsync("eval", $"""
+            const a = document.createElement('a');
+            a.href = 'data:application/json;base64,{base64}';
+            a.download = 'opencaddis.json';
+            a.click();
+        """);
+    }
+
+    private async Task ImportConfig(InputFileChangeEventArgs e)
+    {
+        try
+        {
+            using var stream = e.File.OpenReadStream();
+            var config = await System.Text.Json.JsonSerializer.DeserializeAsync<OpenCaddisConfigurationDto>(stream);
+            if (config is not null)
+            {
+                _agents = config.Agents ?? [];
+                StateHasChanged();
+            }
+        }
+        catch
+        {
+            // Invalid file - silently ignore
+        }
+    }
+
+    // === Helpers ===
+
+    private static string Truncate(string value, int maxLength) =>
+        value.Length <= maxLength ? value : value[..maxLength] + "...";
+
+    // === Render Helper ===
+
+    private RenderFragment RenderAgentEditForm() => __builder =>
+    {
+        <div class="card mb-2 border-primary">
+            <div class="card-body">
+                <EditForm Model="_editingAgent" OnValidSubmit="SaveAgent">
+                    <DataAnnotationsValidator />
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Handle</label>
+                            <InputText @bind-Value="_editingAgent!.Handle" class="form-control" />
+                            <ValidationMessage For="() => _editingAgent!.Handle" />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Agent Type</label>
+                            <InputSelect @bind-Value="_editingAgent!.AgentType" class="form-select">
+                                <option value="">-- Select agent type --</option>
+                                @foreach (var entry in _agentTypes)
+                                {
+                                    @foreach (var alias in entry.Aliases)
+                                    {
+                                        <option value="@alias">@alias</option>
+                                    }
+                                }
+                            </InputSelect>
+                            <ValidationMessage For="() => _editingAgent!.AgentType" />
+                        </div>
+                    </div>
+                    <div class="row g-3 mt-1">
+                        <div class="col-md-6">
+                            <label class="form-label">Models</label>
+                            <InputSelect @bind-Value="_editingAgent!.Models" class="form-select">
+                                <option value="">-- None --</option>
+                                @foreach (var name in _modelConfigNames)
+                                {
+                                    <option value="@name">@name</option>
+                                }
+                            </InputSelect>
+                        </div>
+                        <div class="col-md-6"></div>
+                    </div>
+                    <div class="row g-3 mt-1">
+                        <div class="col-12">
+                            <label class="form-label">Description</label>
+                            <InputTextArea @bind-Value="_editingAgent!.Description" class="form-control" rows="2" placeholder="Brief summary of this agent's capabilities (used by workflow planning)" />
+                        </div>
+                    </div>
+                    <div class="row g-3 mt-1">
+                        <div class="col-12">
+                            <label class="form-label">System Prompt</label>
+                            <InputTextArea @bind-Value="_editingAgent!.SystemPrompt" class="form-control" rows="3" />
+                        </div>
+                    </div>
+
+                    @* === Plugins selector === *@
+                    <div class="mt-3">
+                        <label class="form-label fw-medium">Plugins</label>
+                        <div class="d-flex flex-wrap gap-1 mb-2">
+                            @for (var i = 0; i < _editingPlugins.Count; i++)
+                            {
+                                var index = i;
+                                <span class="badge bg-secondary d-flex align-items-center gap-1">
+                                    @_editingPlugins[index]
+                                    <button type="button" class="btn-close btn-close-white ms-1" style="font-size: 0.6rem;" @onclick="() => RemovePlugin(index)"></button>
+                                </span>
+                            }
+                        </div>
+                        @if (GetAvailablePlugins().Any())
+                        {
+                            <div class="input-group input-group-sm" style="max-width: 320px;">
+                                <select class="form-select" @onchange="OnPluginSelected">
+                                    <option value="">-- Add plugin --</option>
+                                    @foreach (var alias in GetAvailablePlugins())
+                                    {
+                                        <option value="@alias">@alias</option>
+                                    }
+                                </select>
+                            </div>
+                        }
+                        else if (!_plugins.Any())
+                        {
+                            <div class="text-body-secondary small">No plugins registered in the system.</div>
+                        }
+                        else
+                        {
+                            <div class="text-body-secondary small">All available plugins have been added.</div>
+                        }
+                    </div>
+
+                    @* === Per-plugin settings === *@
+                    @foreach (var pluginAlias in _editingPlugins)
+                    {
+                        var defs = PluginSettingsRegistry.GetSettings(pluginAlias);
+                        if (defs.Count > 0)
+                        {
+                            var alias = pluginAlias;
+                            <div class="mt-3 border rounded p-3 bg-body-tertiary">
+                                <label class="form-label fw-medium mb-2">@alias Settings</label>
+                                @foreach (var def in defs)
+                                {
+                                    var settingDef = def;
+                                    var currentValue = GetPluginSettingValue(alias, settingDef.Key);
+                                    <div class="row g-2 mb-2 align-items-center">
+                                        <div class="col-md-4">
+                                            <label class="form-label form-label-sm mb-0 text-body-secondary" title="@settingDef.Description">@settingDef.Label</label>
+                                        </div>
+                                        <div class="col-md-8">
+                                            @if (settingDef.SettingType == PluginSettingType.Boolean)
+                                            {
+                                                <div class="form-check">
+                                                    <input type="checkbox" class="form-check-input"
+                                                           checked="@(string.Equals(currentValue, "true", StringComparison.OrdinalIgnoreCase))"
+                                                           @onchange="e => UpdatePluginBoolSetting(alias, settingDef.Key, e)" />
+                                                </div>
+                                            }
+                                            else if (settingDef.SettingType == PluginSettingType.Number)
+                                            {
+                                                <input type="number" class="form-control form-control-sm"
+                                                       value="@currentValue"
+                                                       @onchange="e => UpdatePluginSetting(alias, settingDef.Key, e.Value?.ToString() ?? string.Empty)" />
+                                            }
+                                            else
+                                            {
+                                                <input type="text" class="form-control form-control-sm"
+                                                       placeholder="@settingDef.DefaultValue"
+                                                       value="@currentValue"
+                                                       @onchange="e => UpdatePluginSetting(alias, settingDef.Key, e.Value?.ToString() ?? string.Empty)" />
+                                            }
+                                        </div>
+                                    </div>
+                                }
+                            </div>
+                        }
+                    }
+
+                    @* === Advanced Args (non-plugin) === *@
+                    <div class="mt-3">
+                        <label class="form-label fw-medium">Advanced Args</label>
+                        @for (var i = 0; i < _editingExtraArgs.Count; i++)
+                        {
+                            var index = i;
+                            <div class="row g-2 mb-2 align-items-center">
+                                <div class="col-5">
+                                    <input type="text" class="form-control form-control-sm" placeholder="Key"
+                                           value="@_editingExtraArgs[index].Key"
+                                           @onchange="e => UpdateExtraArgKey(index, e.Value?.ToString() ?? string.Empty)" />
+                                </div>
+                                <div class="col-5">
+                                    <input type="text" class="form-control form-control-sm" placeholder="Value"
+                                           value="@_editingExtraArgs[index].Value"
+                                           @onchange="e => UpdateExtraArgValue(index, e.Value?.ToString() ?? string.Empty)" />
+                                </div>
+                                <div class="col-2">
+                                    <button type="button" class="btn btn-outline-danger btn-sm" @onclick="() => RemoveExtraArgRow(index)">
+                                        <i class="bi bi-x-lg"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        }
+                        <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="AddExtraArgRow">
+                            <i class="bi bi-plus-lg me-1"></i> Add Arg
+                        </button>
+                    </div>
+
+                    @* === Tools selector === *@
+                    <div class="mt-3">
+                        <label class="form-label fw-medium">Tools</label>
+                        <div class="d-flex flex-wrap gap-1 mb-2">
+                            @for (var i = 0; i < _editingTools.Count; i++)
+                            {
+                                var index = i;
+                                <span class="badge bg-secondary d-flex align-items-center gap-1">
+                                    @_editingTools[index]
+                                    <button type="button" class="btn-close btn-close-white ms-1" style="font-size: 0.6rem;" @onclick="() => RemoveTool(index)"></button>
+                                </span>
+                            }
+                        </div>
+                        @if (GetAvailableTools().Any())
+                        {
+                            <div class="input-group input-group-sm" style="max-width: 320px;">
+                                <select class="form-select" @onchange="OnToolSelected">
+                                    <option value="">-- Add tool --</option>
+                                    @foreach (var alias in GetAvailableTools())
+                                    {
+                                        <option value="@alias">@alias</option>
+                                    }
+                                </select>
+                            </div>
+                        }
+                        else if (!_tools.Any())
+                        {
+                            <div class="text-body-secondary small">No tools registered in the system.</div>
+                        }
+                        else
+                        {
+                            <div class="text-body-secondary small">All available tools have been added.</div>
+                        }
+                    </div>
+
+                    <div class="d-flex gap-2 mt-3">
+                        <button type="submit" class="btn btn-primary btn-sm">Apply</button>
+                        <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="CancelAgentEdit">Cancel</button>
+                    </div>
+                </EditForm>
+            </div>
+        </div>
+    };
+}

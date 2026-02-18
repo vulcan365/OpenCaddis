@@ -1,0 +1,4 @@
+/* Active tab icon gets accent color */
+::deep .nav-tabs .nav-link.active i {
+    color: var(--oc-accent);
+}

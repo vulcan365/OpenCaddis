@@ -1,0 +1,115 @@
+<div class="conversation-list">
+    <div class="conversation-header">
+        <span>Agents</span>
+        <div class="conversation-header-actions">
+            @{
+                var internalCount = Conversations.Count(c => !c.IsConfigured);
+            }
+            @if (internalCount > 0)
+            {
+                <button class="header-icon-btn @(_showInternal ? "active" : "")"
+                        title="@(_showInternal ? "Hide" : "Show") internal agents"
+                        @onclick="ToggleInternal">
+                    <i class="bi bi-gear"></i>
+                    <span class="internal-count">@internalCount</span>
+                </button>
+            }
+            <button class="header-icon-btn @(_isRefreshing ? "spin" : "")"
+                    title="Refresh agents"
+                    disabled="@_isRefreshing"
+                    @onclick="HandleRefresh">
+                <i class="bi bi-arrow-clockwise"></i>
+            </button>
+        </div>
+    </div>
+    <div class="conversation-scroll">
+        @if (IsLoading)
+        {
+            <div class="d-flex justify-content-center p-4">
+                <div class="spinner-border spinner-border-sm text-secondary" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+            </div>
+        }
+        else if (VisibleConversations.Count == 0)
+        {
+            <div class="empty-state" style="padding: 2rem 1rem;">
+                <i class="bi bi-robot"></i>
+                <p>No agents available.</p>
+            </div>
+        }
+        else
+        {
+            <div class="d-flex flex-column gap-1 p-2">
+                @foreach (var conversation in VisibleConversations)
+                {
+                    var isSelected = SelectedConversation?.Handle == conversation.Handle;
+                    <button class="conversation-item @(isSelected ? "active" : "") @(!conversation.IsConfigured ? "internal" : "")"
+                            @onclick="() => OnConversationSelected.InvokeAsync(conversation)">
+                        <div class="conversation-avatar @(isSelected ? "active" : "") @(!conversation.IsConfigured ? "internal-avatar" : "")">
+                            <i class="bi @(conversation.IsConfigured ? "bi-robot" : "bi-gear")"></i>
+                        </div>
+                        <div class="flex-grow-1 min-width-0">
+                            <div class="fw-medium text-truncate">@FormatHandle(conversation.Handle)</div>
+                            <div class="conversation-type">
+                                @conversation.AgentType
+                                @if (!conversation.IsConfigured)
+                                {
+                                    <span class="internal-badge">internal</span>
+                                }
+                            </div>
+                        </div>
+                    </button>
+                }
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    private const string DefaultUserPrefix = "opencaddis-user:";
+
+    [Parameter] public List<ChatAgent> Conversations { get; set; } = [];
+    [Parameter] public ChatAgent? SelectedConversation { get; set; }
+    [Parameter] public bool IsLoading { get; set; }
+    [Parameter] public EventCallback<ChatAgent> OnConversationSelected { get; set; }
+    [Parameter] public EventCallback OnRefresh { get; set; }
+
+    private bool _showInternal;
+    private bool _isRefreshing;
+
+    private List<ChatAgent> VisibleConversations =>
+        _showInternal ? Conversations : Conversations.Where(c => c.IsConfigured).ToList();
+
+    private void ToggleInternal() => _showInternal = !_showInternal;
+
+    private async Task HandleRefresh()
+    {
+        _isRefreshing = true;
+        try
+        {
+            await OnRefresh.InvokeAsync();
+        }
+        finally
+        {
+            _isRefreshing = false;
+        }
+    }
+
+    private static string FormatHandle(string handle)
+    {
+        // Strip the default user prefix
+        if (handle.StartsWith(DefaultUserPrefix, StringComparison.OrdinalIgnoreCase))
+        {
+            handle = handle[DefaultUserPrefix.Length..];
+        }
+
+        // Strip trailing GUID suffix if present (e.g., "my-agent-a1b2c3d4" -> "my-agent")
+        var lastDash = handle.LastIndexOf('-');
+        if (lastDash > 0 && handle.Length - lastDash - 1 == 8)
+        {
+            return handle[..lastDash];
+        }
+        return handle;
+    }
+}

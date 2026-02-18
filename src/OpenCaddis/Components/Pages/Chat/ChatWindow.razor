@@ -1,0 +1,187 @@
+<div class="chat-window">
+    @* Header *@
+    <div class="chat-window-header">
+        <div class="chat-window-avatar">
+            <i class="bi bi-robot"></i>
+        </div>
+        <div>
+            <h6 class="mb-0 fw-semibold">@FormatHandle(Conversation.Handle)</h6>
+            <span class="badge bg-secondary" style="font-size: 0.7rem;">@Conversation.AgentType</span>
+            @if (!Conversation.IsConfigured)
+            {
+                <span class="badge bg-dark" style="font-size: 0.65rem; opacity: 0.7;">internal</span>
+            }
+        </div>
+    </div>
+
+    @* Messages *@
+    <div id="chat-messages" class="chat-history p-3 d-flex flex-column gap-3">
+        @if (Messages.Count == 0)
+        {
+            <div class="empty-state my-auto">
+                <i class="bi bi-chat-text"></i>
+                <p>Send a message to start the conversation.</p>
+            </div>
+        }
+        else
+        {
+            @for (var i = 0; i < Messages.Count; i++)
+            {
+                var message = Messages[i];
+                <div class="msg-row @(message.IsFromUser ? "msg-row-user" : "msg-row-agent")">
+                    @if (!message.IsFromUser)
+                    {
+                        <div class="msg-avatar msg-avatar-agent">
+                            <i class="bi bi-robot"></i>
+                        </div>
+                    }
+                    <div class="msg-bubble @(message.IsFromUser ? "msg-bubble-user" : "msg-bubble-agent")">
+                        @if (message.Status == ChatMessageStatus.ApprovalPending && message.ApprovalInfo is not null)
+                        {
+                            <div class="approval-card">
+                                <div class="approval-header">
+                                    <i class="bi bi-shield-check"></i>
+                                    <span>Approval Required</span>
+                                </div>
+                                <p class="approval-prompt">@message.ApprovalInfo.Prompt</p>
+                                @if (message.ApprovalInfo.Result == ApprovalResult.Pending)
+                                {
+                                    <div class="approval-actions">
+                                        <button class="approval-btn approval-btn-approve" @onclick="() => OnApprovalClick(message, true)">
+                                            <i class="bi bi-check-lg"></i> Approve
+                                        </button>
+                                        <button class="approval-btn approval-btn-deny" @onclick="() => OnApprovalClick(message, false)">
+                                            <i class="bi bi-x-lg"></i> Deny
+                                        </button>
+                                    </div>
+                                }
+                                else
+                                {
+                                    <div class="approval-resolved @(message.ApprovalInfo.Result == ApprovalResult.Approved ? "approval-resolved-approved" : "approval-resolved-denied")">
+                                        @if (message.ApprovalInfo.Result == ApprovalResult.Approved)
+                                        {
+                                            <i class="bi bi-check-circle-fill"></i>
+                                            <span>Approved</span>
+                                        }
+                                        else
+                                        {
+                                            <i class="bi bi-x-circle-fill"></i>
+                                            <span>Denied</span>
+                                        }
+                                    </div>
+                                }
+                            </div>
+                        }
+                        else if (message.Status == ChatMessageStatus.Complete && message.ApprovalInfo is not null)
+                        {
+                            <div class="approval-card">
+                                <div class="approval-header">
+                                    <i class="bi bi-shield-check"></i>
+                                    <span>Approval Gate</span>
+                                </div>
+                                <p class="approval-prompt">@message.ApprovalInfo.Prompt</p>
+                                <div class="approval-resolved @(message.ApprovalInfo.Result == ApprovalResult.Approved ? "approval-resolved-approved" : "approval-resolved-denied")">
+                                    @if (message.ApprovalInfo.Result == ApprovalResult.Approved)
+                                    {
+                                        <i class="bi bi-check-circle-fill"></i>
+                                        <span>Approved</span>
+                                    }
+                                    else
+                                    {
+                                        <i class="bi bi-x-circle-fill"></i>
+                                        <span>Denied</span>
+                                    }
+                                </div>
+                            </div>
+                        }
+                        else if (message.Status == ChatMessageStatus.Thinking)
+                        {
+                            <span class="d-flex align-items-center gap-2 fst-italic" style="color: var(--oc-text-muted);">
+                                <span class="spinner-border spinner-border-sm" role="status"></span>
+                                @message.Content
+                            </span>
+                        }
+                        else if (message.Status == ChatMessageStatus.Error)
+                        {
+                            <span class="text-danger">
+                                <i class="bi bi-exclamation-triangle me-1"></i>@message.Content
+                            </span>
+                        }
+                        else
+                        {
+                            @message.Content
+                        }
+                    </div>
+                    @if (message.IsFromUser)
+                    {
+                        <div class="msg-avatar msg-avatar-user">
+                            <i class="bi bi-person"></i>
+                        </div>
+                    }
+                </div>
+            }
+        }
+    </div>
+
+    @* Error banner *@
+    @if (!string.IsNullOrEmpty(ErrorMessage))
+    {
+        <div class="alert alert-danger mx-3 mb-0 py-2 small">
+            <i class="bi bi-exclamation-triangle me-1"></i>@ErrorMessage
+        </div>
+    }
+
+    @* Input *@
+    <div class="chat-input-area">
+        <form @onsubmit="HandleSubmit" class="d-flex gap-2 align-items-center">
+            <input @bind="_inputText" @bind:event="oninput"
+                   class="form-control chat-input" placeholder="Type a message..."
+                   autocomplete="off" />
+            <button type="submit" class="chat-send-btn"
+                    disabled="@string.IsNullOrWhiteSpace(_inputText)">
+                <i class="bi bi-send-fill"></i>
+            </button>
+        </form>
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public ChatAgent Conversation { get; set; } = default!;
+    [Parameter] public List<ChatMessage> Messages { get; set; } = [];
+    [Parameter] public string? ErrorMessage { get; set; }
+    [Parameter] public EventCallback<string> OnSendMessage { get; set; }
+    [Parameter] public EventCallback<(ChatMessage Message, bool Approved)> OnApproval { get; set; }
+
+    private string? _inputText;
+
+    private async Task HandleSubmit()
+    {
+        var text = _inputText?.Trim();
+        if (string.IsNullOrEmpty(text)) return;
+
+        _inputText = string.Empty;
+        await OnSendMessage.InvokeAsync(text);
+    }
+
+    private async Task OnApprovalClick(ChatMessage message, bool approved)
+    {
+        await OnApproval.InvokeAsync((message, approved));
+    }
+
+    private const string DefaultUserPrefix = "opencaddis-user:";
+
+    private static string FormatHandle(string handle)
+    {
+        if (handle.StartsWith(DefaultUserPrefix, StringComparison.OrdinalIgnoreCase))
+        {
+            handle = handle[DefaultUserPrefix.Length..];
+        }
+
+        var lastDash = handle.LastIndexOf('-');
+        if (lastDash > 0 && handle.Length - lastDash - 1 == 8)
+        {
+            return handle[..lastDash];
+        }
+        return handle;
+    }
+}

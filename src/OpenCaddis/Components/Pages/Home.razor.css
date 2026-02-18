@@ -1,0 +1,74 @@
+/* === Hero Banner === */
+.hero-banner {
+    background: linear-gradient(135deg, var(--oc-bg-surface) 0%, var(--oc-bg-raised) 50%, rgba(63, 184, 169, 0.15) 100%);
+    color: var(--oc-text-primary);
+    border: 1px solid var(--oc-border);
+}
+
+.hero-decoration {
+    position: absolute;
+    right: 2rem;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 6rem;
+    color: var(--oc-accent);
+    opacity: 0.08;
+    pointer-events: none;
+}
+
+/* === Status Cards === */
+.status-card {
+    border-left: 3px solid var(--oc-accent) !important;
+}
+
+.status-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background-color: var(--oc-accent-subtle);
+    color: var(--oc-accent);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    font-size: 1.2rem;
+}
+
+/* === Action Cards === */
+.action-card {
+    border-left: 3px solid var(--oc-accent) !important;
+    transition: border-color var(--oc-transition-fast), box-shadow var(--oc-transition-fast), transform var(--oc-transition-fast);
+}
+
+.action-card:hover {
+    transform: translateY(-1px);
+    box-shadow: var(--oc-shadow-md);
+}
+
+/* === Agent Type Cards === */
+.agent-type-card {
+    border-left: 3px solid var(--oc-accent) !important;
+}
+
+.agent-type-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: var(--oc-radius-sm);
+    background-color: var(--oc-accent-subtle);
+    color: var(--oc-accent);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    font-size: 1.1rem;
+}
+
+.agent-cap-badge {
+    background-color: var(--oc-bg-raised);
+    color: var(--oc-text-secondary);
+    font-weight: 500;
+    font-size: 0.7rem;
+    padding: 0.2em 0.5em;
+    border-radius: var(--oc-radius-sm);
+    border: 1px solid var(--oc-border);
+}

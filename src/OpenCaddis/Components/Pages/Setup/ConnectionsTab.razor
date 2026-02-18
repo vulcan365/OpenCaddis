@@ -1,0 +1,214 @@
+@inject Microsoft365AuthService AuthService
+@inject OpenCaddisConfigService ConfigService
+@inject IJSRuntime JS
+@implements IDisposable
+
+<div class="d-flex flex-column gap-4">
+
+    @* === Microsoft 365 Settings === *@
+    <section>
+        <h5 class="fw-semibold mb-1">Microsoft 365 Settings</h5>
+        <p class="text-body-secondary small mb-3">Azure AD app registration for Microsoft Graph API access.</p>
+
+        <div class="card">
+            <div class="card-body">
+                <p class="text-body-secondary small mb-3">
+                    Enter your Azure AD Application (client) ID. See the
+                    <a href="https://github.com/vulcan365/OpenCaddis#microsoft-365-setup" target="_blank">README</a>
+                    for instructions on creating an app registration.
+                </p>
+                <div class="row g-3">
+                    <div class="col-12">
+                        <label class="form-label">Client ID</label>
+                        <input @bind="_clientId" class="form-control" placeholder="Azure AD Application (client) ID" />
+                    </div>
+                </div>
+                <div class="d-flex justify-content-end mt-3">
+                    <button class="btn btn-primary btn-sm" @onclick="SaveSettings">
+                        <i class="bi bi-save me-1"></i> Save Settings
+                    </button>
+                </div>
+                @if (_settingsSaved)
+                {
+                    <div class="alert alert-success mt-3 mb-0 py-2">Settings saved.</div>
+                }
+            </div>
+        </div>
+    </section>
+
+    @* === Connection Status === *@
+    <section>
+        <h5 class="fw-semibold mb-1">Connection Status</h5>
+        <p class="text-body-secondary small mb-3">Connect to Microsoft 365 to enable email tools for agents.</p>
+
+        <div class="card">
+            <div class="card-body">
+
+                @if (AuthService.IsConnected)
+                {
+                    @* Connected state *@
+                    <div class="d-flex align-items-center gap-2 mb-3">
+                        <span class="badge bg-success">Connected</span>
+                        @if (AuthService.UserDisplayName is not null)
+                        {
+                            <span class="fw-semibold">@AuthService.UserDisplayName</span>
+                        }
+                        @if (AuthService.UserEmail is not null)
+                        {
+                            <span class="text-body-secondary">(@AuthService.UserEmail)</span>
+                        }
+                    </div>
+
+                    @if (AuthService.ConsentedScopes is { Length: > 0 })
+                    {
+                        <div class="mb-3">
+                            <span class="text-body-secondary small me-2">Scopes:</span>
+                            @foreach (var scope in AuthService.ConsentedScopes)
+                            {
+                                <span class="badge bg-secondary me-1">@scope</span>
+                            }
+                        </div>
+                    }
+
+                    <button class="btn btn-outline-danger btn-sm" @onclick="Disconnect">
+                        <i class="bi bi-x-circle me-1"></i> Disconnect
+                    </button>
+                }
+                else if (AuthService.IsPolling && AuthService.CurrentDeviceCode is not null)
+                {
+                    @* Device code flow in progress *@
+                    <div class="d-flex align-items-center gap-2 mb-3">
+                        <span class="badge bg-info">Connecting...</span>
+                        <div class="spinner-border spinner-border-sm text-info" role="status">
+                            <span class="visually-hidden">Polling...</span>
+                        </div>
+                    </div>
+
+                    <div class="alert alert-info mb-3">
+                        <p class="mb-2">To sign in, open your browser and go to:</p>
+                        <p class="mb-2">
+                            <a href="@AuthService.CurrentDeviceCode.VerificationUri" target="_blank" class="fw-bold">
+                                @AuthService.CurrentDeviceCode.VerificationUri
+                            </a>
+                        </p>
+                        <p class="mb-2">Enter this code:</p>
+                        <div class="d-flex align-items-center gap-2 mb-2">
+                            <code class="fs-4 fw-bold p-2 rounded border" style="background-color: var(--oc-bg-raised); color: var(--oc-accent);">@AuthService.CurrentDeviceCode.UserCode</code>
+                            <button class="btn btn-outline-secondary btn-sm" @onclick="CopyCode">
+                                <i class="bi bi-clipboard me-1"></i> Copy
+                            </button>
+                        </div>
+                        <p class="text-body-secondary small mb-0">
+                            This code expires at @AuthService.CurrentDeviceCode.ExpiresAt.LocalDateTime.ToString("HH:mm:ss").
+                        </p>
+                    </div>
+
+                    <button class="btn btn-outline-secondary btn-sm" @onclick="CancelConnect">
+                        <i class="bi bi-x me-1"></i> Cancel
+                    </button>
+                }
+                else
+                {
+                    @* Not connected *@
+                    <div class="d-flex align-items-center gap-2 mb-3">
+                        <span class="badge bg-warning text-dark">Not connected</span>
+                    </div>
+
+                    @if (AuthService.LastError is not null)
+                    {
+                        <div class="alert alert-danger mb-3 py-2">@AuthService.LastError</div>
+                    }
+
+                    <button class="btn btn-primary btn-sm" @onclick="StartConnect"
+                            disabled="@string.IsNullOrEmpty(_clientId)">
+                        <i class="bi bi-plug me-1"></i> Connect to Microsoft 365
+                    </button>
+
+                    @if (string.IsNullOrEmpty(_clientId))
+                    {
+                        <p class="text-body-secondary small mt-2 mb-0">Save your Client ID above first.</p>
+                    }
+                }
+
+            </div>
+        </div>
+    </section>
+</div>
+
+@code {
+    private string _clientId = "";
+    private bool _settingsSaved;
+    private string? _connectError;
+
+    protected override async Task OnInitializedAsync()
+    {
+        AuthService.OnConnectionChanged += HandleConnectionChanged;
+
+        if (ConfigService.ConfigurationExists())
+        {
+            var config = await ConfigService.LoadConfigurationAsync();
+            if (config.Microsoft365 is { ClientId.Length: > 0 })
+            {
+                _clientId = config.Microsoft365.ClientId;
+            }
+        }
+    }
+
+    private async Task SaveSettings()
+    {
+        _settingsSaved = false;
+
+        var config = ConfigService.ConfigurationExists()
+            ? await ConfigService.LoadConfigurationAsync()
+            : new OpenCaddisConfigurationDto();
+
+        config.Microsoft365 ??= new Microsoft365ConfigurationDto();
+        config.Microsoft365.ClientId = _clientId;
+
+        await ConfigService.SaveConfigurationAsync(config);
+        AuthService.Configure(_clientId);
+        _settingsSaved = true;
+    }
+
+    private async Task StartConnect()
+    {
+        _connectError = null;
+        try
+        {
+            AuthService.Configure(_clientId);
+            await AuthService.StartDeviceCodeFlowAsync();
+        }
+        catch (Exception ex)
+        {
+            _connectError = ex.Message;
+        }
+    }
+
+    private void CancelConnect()
+    {
+        AuthService.CancelDeviceCodeFlow();
+    }
+
+    private async Task Disconnect()
+    {
+        await AuthService.DisconnectAsync();
+    }
+
+    private async Task CopyCode()
+    {
+        if (AuthService.CurrentDeviceCode is not null)
+        {
+            await JS.InvokeVoidAsync("navigator.clipboard.writeText", AuthService.CurrentDeviceCode.UserCode);
+        }
+    }
+
+    private void HandleConnectionChanged()
+    {
+        InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose()
+    {
+        AuthService.OnConnectionChanged -= HandleConnectionChanged;
+    }
+}

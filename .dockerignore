@@ -1,0 +1,14 @@
+**/bin/
+**/obj/
+**/.vs/
+**/node_modules/
+.git/
+.claude/
+.keys/
+src/OpenCaddis/data/
+src/OpenCaddis/fabr.json
+src/OpenCaddis/opencaddis.json
+*.md
+LICENSE
+docs/
+build/

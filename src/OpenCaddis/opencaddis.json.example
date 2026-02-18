@@ -1,0 +1,117 @@
+{
+  "Agents": [
+    {
+      "Handle": "Assistant",
+      "AgentType": "assistant",
+      "Models": "default",
+      "Description": "General-purpose conversational agent with file management (read, write, copy, move, delete, search), web browsing (navigate, extract content, screenshots, form filling), PowerShell command execution, email via Microsoft 365 (read, search, send), persistent vector memory, task planning with dependencies, recurring reminders, and date/time lookup.",
+      "SystemPrompt": "You are a helpful assistant with access to tools for file management, web browsing, PowerShell, reminders, and task planning.\n\nWhen you receive a complex or multi-step request, use the TaskManager tools to plan and execute systematically:\n1. PLAN: Use SetGoal to define the objective, then AddTask for each step. Set priorities (1=highest, 4=lowest) and dependencies between tasks.\n2. EXECUTE: Use GetNextTask to find the next ready task, UpdateTask to mark it in_progress, do the work, then UpdateTask to mark it completed with a result summary.\n3. ADAPT: If the plan needs to change, use RemoveTask to drop tasks and AddTask to add new ones. Mark tasks as blocked with a reason if stuck.\n4. REPORT: When all tasks are done, use GetTasks to show the final summary.\n\nFor simple, single-step questions (facts, quick answers, single operations), respond directly without creating a task plan. Only plan when the request genuinely involves multiple distinct steps.\n\nYou have persistent memory across conversations. Use MemorySave to remember important facts, user preferences, and key decisions. Use MemorySearch to recall relevant information before answering questions where past context might help.",
+      "Args": {
+        "WebBrowser:TimeoutMs": "30000",
+        "WebBrowser:MaxContentLength": "50000",
+        "WebBrowser:Headless": "true",
+        "PowerShell:TimeoutSeconds": "30",
+        "PowerShell:MaxOutputLength": "10000",
+        "TaskManager:FileName": "tasks.json",
+        "Microsoft365Email:MaxResults": "25",
+        "Microsoft365Email:MaxBodyLength": "10000",
+        "Memory:MaxResults": "5",
+        "CaddisFly:TimeoutSeconds": "60",
+        "CaddisFly:MaxOutputLength": "10000"
+      },
+      "Plugins": [
+        "Reminders",
+        "WebBrowser",
+        "TaskManager",
+        "FileSystem",
+        "Microsoft365Email",
+        "Memory",
+        "CaddisFly"
+      ],
+      "Tools": [
+        "GetDateTime"
+      ]
+    },
+    {
+      "Handle": "Thinker",
+      "AgentType": "thinking",
+      "Models": "default",
+      "Description": "Deliberative reasoning agent that plans, executes, and verifies multi-step solutions using a structured plan-execute-verify loop. Has file management, web browsing, persistent vector memory, recurring reminders, and date/time lookup. Best suited for tasks requiring careful analysis and iterative refinement.",
+      "SystemPrompt": "You are a thoughtful assistant that carefully analyzes requests, plans solutions, executes them with available tools, and verifies results before responding. You have access to file management, web browsing, PowerShell, reminders, and task planning tools.\n\nYou have persistent memory across conversations. Use MemorySave to remember important facts, user preferences, and key decisions. Use MemorySearch to recall relevant information before answering questions where past context might help.",
+      "Args": {
+        "MaxPlanRevisions": "2",
+        "MaxExecutionRetries": "2",
+        "WebBrowser:TimeoutMs": "30000",
+        "WebBrowser:MaxContentLength": "50000",
+        "WebBrowser:Headless": "true",
+        "PowerShell:TimeoutSeconds": "30",
+        "PowerShell:MaxOutputLength": "10000",
+        "Memory:MaxResults": "5"
+      },
+      "Plugins": [
+        "Reminders",
+        "WebBrowser",
+        "FileSystem",
+        "Memory"
+      ],
+      "Tools": [
+        "GetDateTime"
+      ]
+    },
+    {
+      "Handle": "Docker",
+      "AgentType": "assistant",
+      "Models": "default",
+      "Description": "Docker container management agent that executes Docker CLI commands including build, run, stop, inspect, logs, and compose operations. Commands are sandboxed with shell-injection prevention and interactive-mode blocking.",
+      "SystemPrompt": "You are an assistant helping run docker commands.",
+      "Args": {},
+      "Plugins": [
+        "Docker"
+      ],
+      "Tools": [
+        "GetDateTime"
+      ]
+    },
+    {
+      "Handle": "M365",
+      "AgentType": "assistant",
+      "Models": "default",
+      "Description": "Microsoft 365 email agent that reads, searches, and sends email via Microsoft Graph API. Can list mail folders, filter by read/unread status, search with KQL queries, and compose HTML or plain text messages with To/CC/BCC recipients.",
+      "SystemPrompt": "You are an assistant with access to my email",
+      "Args": {},
+      "Plugins": [
+        "Microsoft365Email"
+      ],
+      "Tools": []
+    },
+    {
+      "Handle": "EventLog",
+      "AgentType": "eventlog",
+      "Models": "",
+      "Description": "Application log analysis agent that maintains a rolling buffer of recent log entries. Can search logs by text, severity level, category, or time range, and provide aggregate statistics. Operates on internal application logs only.",
+      "SystemPrompt": "",
+      "Args": {},
+      "Plugins": [],
+      "Tools": []
+    },
+    {
+      "Handle": "Workflow",
+      "AgentType": "workflow",
+      "Models": "default",
+      "Description": "Multi-agent orchestration engine that decomposes requests into task plans, delegates work to managed agents, evaluates acceptance criteria, and handles retries and replanning. Do not assign tasks directly to this agent.",
+      "SystemPrompt": "",
+      "Args": {
+        "ManagedAgents": "Assistant,Thinker,Docker,M365",
+        "MaxTaskAttempts": "5"
+      },
+      "Plugins": [],
+      "Tools": []
+    }
+  ],
+  "Microsoft365": {
+    "ClientId": "",
+    "EncryptedTokens": null,
+    "UserDisplayName": null,
+    "UserEmail": null
+  }
+}

@@ -1,0 +1,238 @@
+@page "/"
+@rendermode InteractiveServer
+@inject FabrConfigService ConfigService
+@inject IClientContextFactory ClientContextFactory
+@inject IFabrRegistry FabrRegistry
+
+<PageTitle>Dashboard - OpenCaddis</PageTitle>
+
+<div class="container py-4 flex-grow-1 overflow-auto" style="max-width: 960px;">
+
+    @* Hero banner *@
+    <div class="hero-banner p-4 mb-4 rounded-3 position-relative overflow-hidden">
+        <img src="images/caddis-character.png" alt="Caddis Fly Character" class="hero-character position-absolute" style="right: 20px; bottom: -20px; height: 180px; object-fit: contain; z-index: 1;" />
+        <i class="bi bi-water hero-decoration opacity-25"></i>
+        <div class="position-relative" style="z-index: 2; max-width: 65%;">
+            <h1 class="h2 fw-bold">Welcome to OpenCaddis</h1>
+            <p class="mb-3 opacity-75">Your local AI agent workspace powered by Fabr. Create agents, have conversations, and build intelligent workflows.</p>
+            <div class="d-flex flex-wrap gap-2">
+                <a href="/chat" class="btn btn-light fw-semibold">
+                    <i class="bi bi-chat-dots me-1"></i> Start Chatting
+                </a>
+                <a href="https://opencaddis.ai/" target="_blank" rel="noopener noreferrer" class="btn btn-outline-light fw-semibold">
+                    <i class="bi bi-globe2 me-1"></i> Website
+                </a>
+                <a href="https://github.com/vulcan365/OpenCaddis" target="_blank" rel="noopener noreferrer" class="btn btn-outline-light fw-semibold">
+                    <i class="bi bi-github me-1"></i> GitHub
+                </a>
+            </div>
+        </div>
+    </div>
+
+    @* Status cards *@
+    <div class="row g-3 mb-4">
+        <div class="col-md-4">
+            <div class="card status-card h-100">
+                <div class="card-body d-flex align-items-center gap-3">
+                    <div class="status-icon">
+                        <i class="bi bi-gear-fill"></i>
+                    </div>
+                    <div>
+                        <div class="text-body-secondary small text-uppercase" style="letter-spacing: 0.05em;">Configuration</div>
+                        <div class="fw-semibold">
+                            @if (_configExists)
+                            {
+                                <span class="text-success"><i class="bi bi-check-circle me-1"></i>Configured</span>
+                            }
+                            else
+                            {
+                                <span class="text-warning"><i class="bi bi-exclamation-circle me-1"></i>Not configured</span>
+                            }
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card status-card h-100">
+                <div class="card-body d-flex align-items-center gap-3">
+                    <div class="status-icon">
+                        <i class="bi bi-diagram-3-fill"></i>
+                    </div>
+                    <div>
+                        <div class="text-body-secondary small text-uppercase" style="letter-spacing: 0.05em;">Model Configs</div>
+                        <div class="fw-semibold">@_modelCount configured</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card status-card h-100">
+                <div class="card-body d-flex align-items-center gap-3">
+                    <div class="status-icon">
+                        <i class="bi bi-robot"></i>
+                    </div>
+                    <div>
+                        <div class="text-body-secondary small text-uppercase" style="letter-spacing: 0.05em;">Active Agents</div>
+                        <div class="fw-semibold">@_agentCount running</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    @* Quick actions *@
+    <h5 class="fw-semibold mb-3">Quick Actions</h5>
+    <div class="row g-3 mb-4">
+        <div class="col-md-6">
+            <a href="/chat" class="card action-card text-decoration-none h-100">
+                <div class="card-body">
+                    <div class="d-flex align-items-center gap-3 mb-2">
+                        <i class="bi bi-chat-dots fs-4" style="color: var(--oc-accent);"></i>
+                        <h6 class="card-title mb-0 fw-semibold">Chat with Agents</h6>
+                    </div>
+                    <p class="card-text text-body-secondary small mb-0">Create conversations, send messages, and interact with your AI agents in real time.</p>
+                </div>
+            </a>
+        </div>
+        <div class="col-md-6">
+            <a href="/setup" class="card action-card text-decoration-none h-100">
+                <div class="card-body">
+                    <div class="d-flex align-items-center gap-3 mb-2">
+                        <i class="bi bi-sliders fs-4" style="color: var(--oc-accent);"></i>
+                        <h6 class="card-title mb-0 fw-semibold">Manage Configuration</h6>
+                    </div>
+                    <p class="card-text text-body-secondary small mb-0">Add API keys, configure model providers, and manage connection settings.</p>
+                </div>
+            </a>
+        </div>
+    </div>
+
+    @* Getting started *@
+    @if (!_configExists)
+    {
+        <div class="alert alert-info d-flex align-items-start gap-3">
+            <i class="bi bi-info-circle fs-5 flex-shrink-0 mt-1"></i>
+            <div>
+                <h6 class="alert-heading fw-semibold mb-1">Getting Started</h6>
+                <p class="mb-2">To start using OpenCaddis, you need to configure at least one model provider.</p>
+                <ol class="mb-2 ps-3">
+                    <li>Go to <a href="/setup" class="alert-link">Setup</a> and add an API key for your provider (Azure OpenAI, OpenAI, etc.)</li>
+                    <li>Create a model configuration using that API key</li>
+                    <li>Head to <a href="/chat" class="alert-link">Chat</a> and create your first agent conversation</li>
+                </ol>
+            </div>
+        </div>
+    }
+
+    @* Available agent types *@
+    <h5 class="fw-semibold mb-3">Available Agent Types</h5>
+    @if (_agentTypes.Count == 0)
+    {
+        <div class="empty-state border border-dashed rounded">
+            <i class="bi bi-robot"></i>
+            <p>No agent types registered.</p>
+        </div>
+    }
+    else
+    {
+        <div class="row g-3">
+            @foreach (var entry in _agentTypes)
+            {
+                var info = GetAgentTypeInfo(entry);
+                <div class="col-md-6 col-lg-4">
+                    <div class="card agent-type-card h-100">
+                        <div class="card-body">
+                            <div class="d-flex align-items-center gap-3 mb-2">
+                                <div class="agent-type-icon">
+                                    <i class="bi @info.Icon"></i>
+                                </div>
+                                <div>
+                                    <div class="fw-semibold">@string.Join(", ", entry.Aliases)</div>
+                                    <div class="text-body-secondary small">@entry.TypeName.Split('.').Last()</div>
+                                </div>
+                            </div>
+                            <p class="text-body-secondary small mb-2">@info.Description</p>
+                            @if (info.Capabilities.Count > 0)
+                            {
+                                <div class="d-flex flex-wrap gap-1">
+                                    @foreach (var cap in info.Capabilities)
+                                    {
+                                        <span class="badge agent-cap-badge">@cap</span>
+                                    }
+                                </div>
+                            }
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    private bool _configExists;
+    private int _modelCount;
+    private int _agentCount;
+    private List<RegistryEntry> _agentTypes = [];
+
+    private record AgentTypeInfo(string Icon, string Description, List<string> Capabilities);
+
+    private static AgentTypeInfo GetAgentTypeInfo(RegistryEntry entry)
+    {
+        var typeName = entry.TypeName;
+
+        if (typeName.Contains("AssistantAgent"))
+            return new AgentTypeInfo(
+                "bi-chat-left-text",
+                "General-purpose conversational AI agent. Processes messages using a chat model and supports tool calling through configurable plugins for extended capabilities.",
+                ["Chat", "Tool Use", "Plugins"]);
+
+        if (typeName.Contains("EventLogAgent"))
+            return new AgentTypeInfo(
+                "bi-journal-text",
+                "Application log analyst that maintains a rolling buffer of up to 1,000 log entries. Search, filter, and summarize logs by severity, category, time range, or text.",
+                ["Log Search", "Filtering", "Statistics"]);
+
+        if (typeName.Contains("WorkflowAgent"))
+            return new AgentTypeInfo(
+                "bi-diagram-3",
+                "Orchestration agent that coordinates multiple agents to complete complex multi-step tasks. Generates execution plans, delegates work, evaluates results, and handles retries and replanning.",
+                ["Planning", "Delegation", "Multi-Agent"]);
+
+        return new AgentTypeInfo(
+            "bi-robot",
+            entry.TypeName,
+            []);
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        _configExists = ConfigService.ConfigurationExists();
+        _agentTypes = FabrRegistry.GetAgentTypes();
+
+        if (_configExists)
+        {
+            try
+            {
+                var config = await ConfigService.LoadConfigurationAsync();
+                _modelCount = config.ModelConfigurations?.Count ?? 0;
+            }
+            catch
+            {
+                // Config file may be malformed
+            }
+
+            try
+            {
+                var context = await ClientContextFactory.GetOrCreateAsync("opencaddis-user");
+                var agents = await context.GetTrackedAgents();
+                _agentCount = agents.Count;
+            }
+            catch
+            {
+                // No agents tracked yet
+            }
+        }
+    }
+}

@@ -1,0 +1,275 @@
+@using System.ComponentModel.DataAnnotations
+@inject FabrConfigService ConfigService
+@inject IJSRuntime JS
+
+<EditForm Model="_form" OnValidSubmit="SaveConfiguration">
+    <DataAnnotationsValidator />
+    <div class="d-flex flex-column gap-4">
+
+        @* === Import / Export === *@
+        <div class="d-flex gap-2 justify-content-end">
+            <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="ExportConfig" disabled="@(!_hasExistingConfig)">
+                <i class="bi bi-download me-1"></i> Export
+            </button>
+            <label class="btn btn-outline-secondary btn-sm mb-0 position-relative">
+                <i class="bi bi-upload me-1"></i> Import
+                <InputFile OnChange="ImportConfig" accept=".json" class="position-absolute top-0 start-0 w-100 h-100 opacity-0" style="cursor: pointer;" />
+            </label>
+        </div>
+
+        @* === Connection Settings (shared) === *@
+        <section>
+            <h5 class="fw-semibold mb-1">Connection</h5>
+            <p class="text-body-secondary small mb-3">Provider connection shared by both models.</p>
+
+            <div class="card">
+                <div class="card-body">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Provider</label>
+                            <InputSelect @bind-Value="_form.Provider" class="form-select">
+                                @foreach (var provider in Providers)
+                                {
+                                    <option value="@provider">@provider</option>
+                                }
+                            </InputSelect>
+                            <ValidationMessage For="() => _form.Provider" />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Endpoint URI <span class="text-body-secondary fw-normal">(opt)</span></label>
+                            <InputText @bind-Value="_form.EndpointUri" class="form-control" placeholder="https://your-resource.cognitiveservices.azure.com/" />
+                            <div class="form-text">Required for Azure AI Foundry. Optional for OpenAI.</div>
+                        </div>
+                    </div>
+                    <div class="row g-3 mt-1">
+                        <div class="col-12">
+                            <label class="form-label">API Key</label>
+                            <div class="input-group">
+                                <input type="@(_showApiKey ? "text" : "password")" class="form-control" placeholder="Enter your API key"
+                                       value="@_form.ApiKey"
+                                       @onchange="e => _form.ApiKey = e.Value?.ToString() ?? string.Empty" />
+                                <button type="button" class="btn btn-outline-secondary" @onclick="() => _showApiKey = !_showApiKey" tabindex="-1">
+                                    <i class="bi @(_showApiKey ? "bi-eye-slash" : "bi-eye")"></i>
+                                </button>
+                            </div>
+                            <ValidationMessage For="() => _form.ApiKey" />
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        @* === Default Model === *@
+        <section>
+            <div class="d-flex align-items-center gap-2 mb-1">
+                <h5 class="fw-semibold mb-0">Default Model</h5>
+                <span class="badge bg-primary">default</span>
+            </div>
+            <p class="text-body-secondary small mb-3">Chat and completion model used by agents.</p>
+
+            <div class="card">
+                <div class="card-body">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Model</label>
+                            <InputText @bind-Value="_form.DefaultModel" class="form-control" placeholder="e.g. gpt-4o, gpt-5-nano" />
+                            <ValidationMessage For="() => _form.DefaultModel" />
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Timeout (s)</label>
+                            <InputNumber @bind-Value="_form.DefaultTimeoutSeconds" class="form-control" />
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Max Tokens <span class="text-body-secondary fw-normal">(opt)</span></label>
+                            <InputNumber @bind-Value="_form.DefaultMaxOutputTokens" class="form-control" />
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        @* === Embeddings Model === *@
+        <section>
+            <div class="d-flex align-items-center gap-2 mb-1">
+                <h5 class="fw-semibold mb-0">Embeddings Model</h5>
+                <span class="badge bg-secondary">embeddings</span>
+            </div>
+            <p class="text-body-secondary small mb-3">Text embedding model for vector operations.</p>
+
+            <div class="card">
+                <div class="card-body">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Model</label>
+                            <InputText @bind-Value="_form.EmbeddingsModel" class="form-control" placeholder="e.g. text-embedding-ada-002" />
+                            <ValidationMessage For="() => _form.EmbeddingsModel" />
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Timeout (s)</label>
+                            <InputNumber @bind-Value="_form.EmbeddingsTimeoutSeconds" class="form-control" />
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Max Tokens <span class="text-body-secondary fw-normal">(opt)</span></label>
+                            <InputNumber @bind-Value="_form.EmbeddingsMaxOutputTokens" class="form-control" />
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        @* === Save === *@
+        <div class="d-flex justify-content-end pt-3 border-top">
+            <button type="submit" class="btn btn-primary">
+                <i class="bi bi-save me-1"></i> Save Configuration
+            </button>
+        </div>
+    </div>
+</EditForm>
+
+@code {
+    [Parameter]
+    public EventCallback OnConfigurationSaved { get; set; }
+
+    private SetupFormModel _form = new();
+    private bool _hasExistingConfig;
+    private bool _showApiKey;
+
+    private static readonly string[] Providers = ["Azure", "OpenAI"];
+
+    protected override async Task OnInitializedAsync()
+    {
+        _hasExistingConfig = ConfigService.ConfigurationExists();
+
+        if (_hasExistingConfig)
+        {
+            var config = await ConfigService.LoadConfigurationAsync();
+            LoadFromConfig(config);
+        }
+    }
+
+    private void LoadFromConfig(FabrConfigurationDto config)
+    {
+        var apiKey = config.ApiKeys.FirstOrDefault();
+        var defaultModel = config.ModelConfigurations.FirstOrDefault(m => m.Name == "default");
+        var embeddingsModel = config.ModelConfigurations.FirstOrDefault(m => m.Name == "embeddings");
+
+        // Connection (from first API key + first model's provider/URI)
+        _form.ApiKey = apiKey?.Value ?? string.Empty;
+        _form.Provider = defaultModel?.Provider ?? embeddingsModel?.Provider ?? "Azure";
+        _form.EndpointUri = defaultModel?.Uri ?? embeddingsModel?.Uri ?? string.Empty;
+
+        // Default model
+        if (defaultModel is not null)
+        {
+            _form.DefaultModel = defaultModel.Model;
+            _form.DefaultTimeoutSeconds = defaultModel.TimeoutSeconds;
+            _form.DefaultMaxOutputTokens = defaultModel.MaxOutputTokens;
+        }
+
+        // Embeddings model
+        if (embeddingsModel is not null)
+        {
+            _form.EmbeddingsModel = embeddingsModel.Model;
+            _form.EmbeddingsTimeoutSeconds = embeddingsModel.TimeoutSeconds;
+            _form.EmbeddingsMaxOutputTokens = embeddingsModel.MaxOutputTokens;
+        }
+    }
+
+    private FabrConfigurationDto BuildConfig() => new()
+    {
+        ApiKeys =
+        [
+            new ApiKeyConfigurationDto { Alias = "default-key", Value = _form.ApiKey }
+        ],
+        ModelConfigurations =
+        [
+            new ModelConfigurationDto
+            {
+                Name = "default",
+                Provider = _form.Provider,
+                Uri = _form.EndpointUri,
+                Model = _form.DefaultModel,
+                ApiKeyAlias = "default-key",
+                TimeoutSeconds = _form.DefaultTimeoutSeconds,
+                MaxOutputTokens = _form.DefaultMaxOutputTokens
+            },
+            new ModelConfigurationDto
+            {
+                Name = "embeddings",
+                Provider = _form.Provider,
+                Uri = _form.EndpointUri,
+                Model = _form.EmbeddingsModel,
+                ApiKeyAlias = "default-key",
+                TimeoutSeconds = _form.EmbeddingsTimeoutSeconds,
+                MaxOutputTokens = _form.EmbeddingsMaxOutputTokens
+            }
+        ]
+    };
+
+    private async Task SaveConfiguration()
+    {
+        await ConfigService.SaveConfigurationAsync(BuildConfig());
+        await OnConfigurationSaved.InvokeAsync();
+    }
+
+    // === Import / Export ===
+
+    private async Task ExportConfig()
+    {
+        var config = BuildConfig();
+        var json = System.Text.Json.JsonSerializer.Serialize(config, new System.Text.Json.JsonSerializerOptions { WriteIndented = true });
+        var bytes = System.Text.Encoding.UTF8.GetBytes(json);
+        var base64 = Convert.ToBase64String(bytes);
+
+        await JS.InvokeVoidAsync("eval", $"""
+            const a = document.createElement('a');
+            a.href = 'data:application/json;base64,{base64}';
+            a.download = 'fabr.json';
+            a.click();
+        """);
+    }
+
+    private async Task ImportConfig(InputFileChangeEventArgs e)
+    {
+        try
+        {
+            using var stream = e.File.OpenReadStream();
+            var config = await System.Text.Json.JsonSerializer.DeserializeAsync<FabrConfigurationDto>(stream);
+            if (config is not null)
+            {
+                LoadFromConfig(config);
+                StateHasChanged();
+            }
+        }
+        catch
+        {
+            // Invalid file - silently ignore
+        }
+    }
+
+    // === Form Model ===
+
+    private sealed class SetupFormModel
+    {
+        // Connection (shared)
+        [Required]
+        public string Provider { get; set; } = "Azure";
+
+        public string EndpointUri { get; set; } = string.Empty;
+
+        [Required]
+        public string ApiKey { get; set; } = string.Empty;
+
+        // Default model
+        [Required]
+        public string DefaultModel { get; set; } = string.Empty;
+        public int DefaultTimeoutSeconds { get; set; } = 60;
+        public int? DefaultMaxOutputTokens { get; set; }
+
+        // Embeddings model
+        [Required]
+        public string EmbeddingsModel { get; set; } = string.Empty;
+        public int EmbeddingsTimeoutSeconds { get; set; } = 60;
+        public int? EmbeddingsMaxOutputTokens { get; set; }
+    }
+}
