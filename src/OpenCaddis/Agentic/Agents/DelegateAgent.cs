@@ -40,15 +40,18 @@ public class DelegateAgent : FabrAgentProxy
 
     public override async Task OnInitialize()
     {
-        var modelConfig = config.Args?.GetValueOrDefault("ModelConfig") ?? "default";
+        var modelConfigName = config.Args?.GetValueOrDefault("ModelConfig") ?? "default";
 
-        _routingClient = await GetChatClient(modelConfig);
+        _routingClient = await GetChatClient(modelConfigName);
 
-        (_agent, _session) = await CreateChatClientAgent(
-            modelConfig,
+        var result = await CreateChatClientAgent(
+            modelConfigName,
             threadId: config.Handle ?? fabrAgentHost.GetHandle(),
             tools: []
         );
+
+        _agent = result.Agent;
+        _session = result.Session;
 
         await DiscoverAvailableAgents();
 
@@ -100,6 +103,15 @@ public class DelegateAgent : FabrAgentProxy
         logger.LogDebug(
             "DelegateAgent message content: {Message}",
             Truncate(message.Message ?? "", 200));
+
+        // Run compaction if needed before invoking the model
+        var compaction = await TryCompactAsync(
+            onCompacting: () => SendThinkingAsync("Compacting history..."));
+        if (compaction?.WasCompacted == true)
+        {
+            await SendThinkingAsync(
+                $"Compacted history: {compaction.OriginalMessageCount} → {compaction.CompactedMessageCount} messages");
+        }
 
         try
         {
@@ -310,7 +322,7 @@ public class DelegateAgent : FabrAgentProxy
         };
 
         var response = await _routingClient!.GetResponseAsync(
-            [new ChatMessage(ChatRole.User, userPrompt)], chatOptions);
+            [new Microsoft.Extensions.AI.ChatMessage(ChatRole.User, userPrompt)], chatOptions);
 
         var text = response.Text?.Trim() ?? "{}";
         var json = TryExtractJsonObject(text) ?? "{}";

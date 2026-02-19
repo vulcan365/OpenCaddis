@@ -28,6 +28,8 @@ public class ModelConfigurationDto
     public int TimeoutSeconds { get; set; } = 60;
 
     public int? MaxOutputTokens { get; set; }
+
+    public int? ContextWindowTokens { get; set; }
 }
 
 public class ApiKeyConfigurationDto
