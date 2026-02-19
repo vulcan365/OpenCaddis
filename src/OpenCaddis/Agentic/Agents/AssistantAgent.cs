@@ -21,18 +21,21 @@ public class AssistantAgent : FabrAgentProxy
 
     public override async Task OnInitialize()
     {
-        var modelConfig = config.Args?.GetValueOrDefault("ModelConfig") ?? "default";
+        var modelConfigName = config.Args?.GetValueOrDefault("ModelConfig") ?? "default";
         var tools = await ResolveConfiguredToolsAsync();
 
-        (agent, session) = await CreateChatClientAgent(
-            modelConfig,
+        var result = await CreateChatClientAgent(
+            modelConfigName,
             threadId: config.Handle ?? fabrAgentHost.GetHandle(),
             tools: tools
         );
 
+        agent = result.Agent;
+        session = result.Session;
+
         logger.LogInformation(
             "AssistantAgent '{Handle}' initialized with model config '{ModelConfig}' and {ToolCount} tools",
-            config.Handle, modelConfig, tools.Count);
+            config.Handle, modelConfigName, tools.Count);
     }
 
     public override async Task<AgentMessage> OnMessage(AgentMessage message)
@@ -54,6 +57,15 @@ public class AssistantAgent : FabrAgentProxy
 
         // Send a thinking indicator to the client
         await ThinkingNotifier.SendThinkingAsync(fabrAgentHost, "Thinking...");
+
+        // Run compaction if needed before invoking the model
+        var compaction = await TryCompactAsync(
+            onCompacting: () => ThinkingNotifier.SendThinkingAsync(fabrAgentHost, "Compacting history..."));
+        if (compaction?.WasCompacted == true)
+        {
+            await ThinkingNotifier.SendThinkingAsync(fabrAgentHost,
+                $"Compacted history: {compaction.OriginalMessageCount} → {compaction.CompactedMessageCount} messages");
+        }
 
         try
         {

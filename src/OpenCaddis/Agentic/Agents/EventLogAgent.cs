@@ -57,7 +57,7 @@ public class EventLogAgent : FabrAgentProxy
             AIFunctionFactory.Create(GetLogCount),
         };
 
-        (_agent, _session) = await CreateChatClientAgent(
+        (_agent, _session, _) = await CreateChatClientAgent(
             modelConfig,
             threadId: config.Handle ?? fabrAgentHost.GetHandle(),
             tools: tools,

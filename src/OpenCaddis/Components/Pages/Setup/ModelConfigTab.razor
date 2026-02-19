@@ -84,6 +84,13 @@
                             <InputNumber @bind-Value="_form.DefaultMaxOutputTokens" class="form-control" />
                         </div>
                     </div>
+                    <div class="row g-3 mt-1">
+                        <div class="col-md-6">
+                            <label class="form-label">Context Window <span class="text-body-secondary fw-normal">(tokens, opt)</span></label>
+                            <InputNumber @bind-Value="_form.DefaultContextWindowTokens" class="form-control" placeholder="e.g. 128000" />
+                            <div class="form-text">Total context window size. Used for automatic chat history compaction.</div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </section>
@@ -164,6 +171,7 @@
             _form.DefaultModel = defaultModel.Model;
             _form.DefaultTimeoutSeconds = defaultModel.TimeoutSeconds;
             _form.DefaultMaxOutputTokens = defaultModel.MaxOutputTokens;
+            _form.DefaultContextWindowTokens = defaultModel.ContextWindowTokens;
         }
 
         // Embeddings model
@@ -191,7 +199,8 @@
                 Model = _form.DefaultModel,
                 ApiKeyAlias = "default-key",
                 TimeoutSeconds = _form.DefaultTimeoutSeconds,
-                MaxOutputTokens = _form.DefaultMaxOutputTokens
+                MaxOutputTokens = _form.DefaultMaxOutputTokens,
+                ContextWindowTokens = _form.DefaultContextWindowTokens
             },
             new ModelConfigurationDto
             {
@@ -265,6 +274,7 @@
         public string DefaultModel { get; set; } = string.Empty;
         public int DefaultTimeoutSeconds { get; set; } = 60;
         public int? DefaultMaxOutputTokens { get; set; }
+        public int? DefaultContextWindowTokens { get; set; }
 
         // Embeddings model
         [Required]

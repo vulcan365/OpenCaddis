@@ -1,5 +1,6 @@
 using Fabr.Client;
 using Fabr.Host;
+using Fabr.Sdk;
 using Microsoft.AspNetCore.DataProtection;
 using OpenCaddis.Components;
 using OpenCaddis.Services;
@@ -33,6 +34,7 @@ namespace OpenCaddis
             builder.Services.AddSingleton<CaddisFlyRuntimeService>();
             builder.Services.AddSingleton<CaddisFlyRunStore>();
             builder.Services.AddSingleton<CommandExecutorFactory>();
+            builder.Services.AddSingleton<CompactionService>();
             builder.Services.AddHostedService<AgentBootstrapService>();
             builder.Services.AddHostedService<VectorStoreBootstrapService>();
 
