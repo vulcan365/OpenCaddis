@@ -29,6 +29,10 @@ public class AssistantAgent : FabrAgentProxy
             threadId: config.Handle ?? fabrAgentHost.GetHandle(),
             tools: tools
         );
+
+        logger.LogInformation(
+            "AssistantAgent '{Handle}' initialized with model config '{ModelConfig}' and {ToolCount} tools",
+            config.Handle, modelConfig, tools.Count);
     }
 
     public override async Task<AgentMessage> OnMessage(AgentMessage message)
@@ -41,6 +45,13 @@ public class AssistantAgent : FabrAgentProxy
 
         var response = message.Response();
 
+        logger.LogInformation(
+            "AssistantAgent '{Handle}' received message from {From} on channel '{Channel}'",
+            config.Handle, message.FromHandle, message.Channel);
+        logger.LogDebug(
+            "AssistantAgent '{Handle}' message content: {Message}",
+            config.Handle, Truncate(message.Message ?? "", 200));
+
         // Send a thinking indicator to the client
         await ThinkingNotifier.SendThinkingAsync(fabrAgentHost, "Thinking...");
 
@@ -48,13 +59,20 @@ public class AssistantAgent : FabrAgentProxy
         {
             var result = await agent!.RunAsync(message.Message ?? string.Empty, session);
             response.Message = result.Text ?? "No response";
+
+            logger.LogInformation(
+                "AssistantAgent '{Handle}' completed response ({Length} chars)",
+                config.Handle, response.Message.Length);
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Error processing message");
+            logger.LogError(ex, "AssistantAgent '{Handle}' error processing message", config.Handle);
             response.Message = $"Error: {ex.Message}";
         }
 
         return response;
     }
+
+    private static string Truncate(string text, int maxLength) =>
+        text.Length <= maxLength ? text : text[..maxLength] + "...";
 }

@@ -117,6 +117,13 @@ public class WorkflowAgent : FabrAgentProxy
 
         var response = message.Response();
 
+        logger.LogInformation(
+            "WorkflowAgent received message from {From} on channel '{Channel}'",
+            message.FromHandle, message.Channel);
+        logger.LogDebug(
+            "WorkflowAgent message content: {Message}",
+            Truncate(message.Message ?? "", 200));
+
         // ── Agent channel: delegated agent response ──
         if (string.Equals(message.Channel, "agent", StringComparison.OrdinalIgnoreCase))
         {
@@ -130,6 +137,10 @@ public class WorkflowAgent : FabrAgentProxy
         {
             var plan = await GetStateAsync<WorkflowPlan>(PlanStateKey);
             var userMessage = message.Message ?? string.Empty;
+
+            logger.LogInformation(
+                "WorkflowAgent routing user message, current plan status: {Status}",
+                plan?.Status.ToString() ?? "none");
 
             response.Message = plan?.Status switch
             {
@@ -162,6 +173,10 @@ public class WorkflowAgent : FabrAgentProxy
         var agentCatalog = BuildAgentCatalog();
         var planOutput = await GeneratePlan(userMessage, agentCatalog);
 
+        logger.LogInformation(
+            "WorkflowAgent generated plan: goal='{Goal}', tasks={TaskCount}, missingInfo={HasMissingInfo}",
+            Truncate(planOutput.Goal, 100), planOutput.Tasks.Count, !string.IsNullOrEmpty(planOutput.MissingInfo));
+
         if (!string.IsNullOrEmpty(planOutput.MissingInfo))
         {
             return $"I need some clarification before I can create a plan:\n\n{planOutput.MissingInfo}";
@@ -188,11 +203,13 @@ public class WorkflowAgent : FabrAgentProxy
 
         if (lower is "go" or "run" or "run it" or "execute" or "start" or "yes" or "approve" or "ok" or "okay" or "y")
         {
+            logger.LogInformation("WorkflowAgent plan approved by user, starting execution");
             return await StartExecution(plan);
         }
 
         if (lower is "cancel" or "no" or "n" or "discard")
         {
+            logger.LogInformation("WorkflowAgent plan cancelled by user");
             plan.Status = PlanStatus.Failed;
             plan.Notes = "Cancelled by user";
             plan.UpdatedAt = DateTimeOffset.UtcNow;
@@ -311,7 +328,14 @@ public class WorkflowAgent : FabrAgentProxy
         // Validate plan
         var validation = ValidatePlan(plan);
         if (validation is not null)
+        {
+            logger.LogWarning("WorkflowAgent plan validation failed: {Validation}", validation);
             return validation;
+        }
+
+        logger.LogInformation(
+            "WorkflowAgent starting execution of plan '{Goal}' with {TaskCount} tasks",
+            Truncate(plan.Goal, 100), plan.Tasks.Count);
 
         plan.Status = PlanStatus.Executing;
         plan.UpdatedAt = DateTimeOffset.UtcNow;
@@ -338,6 +362,10 @@ public class WorkflowAgent : FabrAgentProxy
 
         // Reload final state — RunExecutionTick updates status as it goes
         plan = await GetStateAsync<WorkflowPlan>(PlanStateKey) ?? plan;
+
+        logger.LogInformation(
+            "WorkflowAgent execution finished with status {Status}",
+            plan.Status);
 
         return plan.Status switch
         {
@@ -451,6 +479,10 @@ public class WorkflowAgent : FabrAgentProxy
             await SendThinkingAsync($"Evaluating: {task.Title}...");
             var evaluation = await EvaluateAcceptanceCriteria(task, responseText, plan.Goal);
 
+            logger.LogInformation(
+                "WorkflowAgent acceptance evaluation for task '{Task}': satisfied={Satisfied}, reasoning={Reasoning}",
+                task.Title, evaluation.Satisfied, Truncate(evaluation.Reasoning, 200));
+
             if (evaluation.Satisfied)
             {
                 task.Status = WorkflowTaskStatus.Completed;
@@ -539,6 +571,10 @@ public class WorkflowAgent : FabrAgentProxy
 
     private async Task<string> TriggerReplan(WorkflowPlan plan, string reason)
     {
+        logger.LogInformation(
+            "WorkflowAgent triggering replan (v{Version}): {Reason}",
+            plan.PlanVersion, Truncate(reason, 200));
+
         if (plan.PlanVersion >= plan.RunConfig.MaxTotalReplans + 1)
         {
             plan.Status = PlanStatus.Failed;

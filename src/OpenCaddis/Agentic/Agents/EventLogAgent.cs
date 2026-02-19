@@ -75,14 +75,22 @@ public class EventLogAgent : FabrAgentProxy
     {
         var response = message.Response();
 
+        logger.LogInformation(
+            "EventLogAgent received query from {From}: {Message}",
+            message.FromHandle, Truncate(message.Message ?? "", 200));
+
         try
         {
             var result = await _agent!.RunAsync(message.Message ?? string.Empty, _session);
             response.Message = result.Text ?? "No response";
+
+            logger.LogInformation(
+                "EventLogAgent completed query response ({Length} chars, {BufferCount} entries in buffer)",
+                response.Message.Length, _count);
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Error processing message");
+            logger.LogError(ex, "EventLogAgent error processing query");
             response.Message = $"Error: {ex.Message}";
         }
 
@@ -328,6 +336,9 @@ public class EventLogAgent : FabrAgentProxy
         logger.LogInformation("GetLogCount called: {Count} entries in buffer", _count);
         return $"There are {_count} log entries in the buffer (capacity: {MaxLogEntries}).";
     }
+
+    private static string Truncate(string text, int maxLength) =>
+        text.Length <= maxLength ? text : text[..maxLength] + "...";
 
     // ─── Log Record ─────────────────────────────────────────────────
 
