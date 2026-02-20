@@ -2,6 +2,10 @@
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src
 
+#Add MinVer support
+ARG VERSION=0.0.0
+ENV MinVerVersionOverride=$VERSION
+
 # Restore dependencies
 COPY src/OpenCaddis/OpenCaddis.csproj src/OpenCaddis/
 RUN dotnet restore src/OpenCaddis/OpenCaddis.csproj
