@@ -35,8 +35,10 @@ namespace OpenCaddis
             builder.Services.AddSingleton<CaddisFlyRunStore>();
             builder.Services.AddSingleton<CommandExecutorFactory>();
             builder.Services.AddSingleton<CompactionService>();
+            builder.Services.AddSingleton<SipRegistrationService>();
             builder.Services.AddHostedService<AgentBootstrapService>();
             builder.Services.AddHostedService<VectorStoreBootstrapService>();
+            builder.Services.AddHostedService<SipPhoneBootstrapService>();
 
             builder.Services.AddOpenApi();
 
