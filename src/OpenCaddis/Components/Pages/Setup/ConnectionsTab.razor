@@ -192,6 +192,40 @@
         </div>
     </section>
 
+    @* === Azure Speech Settings === *@
+    <section>
+        <h5 class="fw-semibold mb-1">Azure Speech Settings</h5>
+        <p class="text-body-secondary small mb-3">Azure Cognitive Services Speech for call transcription (STT).</p>
+
+        <div class="card">
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-12">
+                        <label class="form-label">Endpoint <span class="text-body-secondary">(reference)</span></label>
+                        <input @bind="_azureSpeechEndpoint" class="form-control" placeholder="https://your-resource.cognitiveservices.azure.com/" />
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Region</label>
+                        <input @bind="_azureSpeechRegion" class="form-control" placeholder="eastus2" />
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">API Key</label>
+                        <input @bind="_azureSpeechKey" type="password" class="form-control" placeholder="@(_hasSavedAzureSpeechKey ? "(saved — leave blank to keep)" : "")" />
+                    </div>
+                </div>
+                <div class="d-flex justify-content-end mt-3">
+                    <button class="btn btn-primary btn-sm" @onclick="SaveAzureSpeechSettings">
+                        <i class="bi bi-save me-1"></i> Save Settings
+                    </button>
+                </div>
+                @if (_azureSpeechSettingsSaved)
+                {
+                    <div class="alert alert-success mt-3 mb-0 py-2">Azure Speech settings saved.</div>
+                }
+            </div>
+        </div>
+    </section>
+
     @* === SIP Registration Status === *@
     <section>
         <h5 class="fw-semibold mb-1">SIP Registration Status</h5>
@@ -300,6 +334,13 @@
     private bool _sipSettingsSaved;
     private bool _hasSavedSipPassword;
 
+    // Azure Speech fields
+    private string _azureSpeechEndpoint = "";
+    private string _azureSpeechRegion = "";
+    private string _azureSpeechKey = "";
+    private bool _azureSpeechSettingsSaved;
+    private bool _hasSavedAzureSpeechKey;
+
     protected override async Task OnInitializedAsync()
     {
         AuthService.OnConnectionChanged += HandleConnectionChanged;
@@ -324,6 +365,13 @@
                 _sipExtension = config.SipPhone.Extension ?? "";
                 _sipDisplayName = config.SipPhone.DisplayName ?? "";
                 _hasSavedSipPassword = !string.IsNullOrEmpty(config.SipPhone.EncryptedPassword);
+            }
+
+            if (config.AzureSpeech is not null)
+            {
+                _azureSpeechEndpoint = config.AzureSpeech.Endpoint;
+                _azureSpeechRegion = config.AzureSpeech.Region;
+                _hasSavedAzureSpeechKey = !string.IsNullOrEmpty(config.AzureSpeech.EncryptedKey);
             }
         }
     }
@@ -402,6 +450,29 @@
 
         await ConfigService.SaveConfigurationAsync(config);
         _sipSettingsSaved = true;
+    }
+
+    private async Task SaveAzureSpeechSettings()
+    {
+        _azureSpeechSettingsSaved = false;
+
+        var config = ConfigService.ConfigurationExists()
+            ? await ConfigService.LoadConfigurationAsync()
+            : new OpenCaddisConfigurationDto();
+
+        config.AzureSpeech ??= new AzureSpeechConfigurationDto();
+        config.AzureSpeech.Endpoint = _azureSpeechEndpoint;
+        config.AzureSpeech.Region = _azureSpeechRegion;
+
+        if (!string.IsNullOrEmpty(_azureSpeechKey))
+        {
+            config.AzureSpeech.EncryptedKey = SipService.EncryptSpeechKey(_azureSpeechKey);
+            _hasSavedAzureSpeechKey = true;
+            _azureSpeechKey = "";
+        }
+
+        await ConfigService.SaveConfigurationAsync(config);
+        _azureSpeechSettingsSaved = true;
     }
 
     private async Task StartSipRegistration()

@@ -1,7 +1,10 @@
 using System.Net;
 using System.Net.Sockets;
+using Fabr.Client;
+using Fabr.Core;
 using Microsoft.AspNetCore.DataProtection;
 using SIPSorcery.Media;
+using SIPSorcery.Net;
 using SIPSorcery.SIP;
 using SIPSorcery.SIP.App;
 
@@ -9,13 +12,22 @@ namespace OpenCaddis.Services;
 
 public sealed class SipRegistrationService : IDisposable
 {
+    private const string UserHandle = "opencaddis-user";
+
     private readonly IDataProtector _protector;
+    private readonly IDataProtector _azureSpeechProtector;
     private readonly OpenCaddisConfigService _configService;
+    private readonly IClientContextFactory _clientContextFactory;
+    private readonly ILoggerFactory _loggerFactory;
     private readonly ILogger<SipRegistrationService> _logger;
 
     private SIPTransport? _transport;
     private SIPRegistrationUserAgent? _regAgent;
     private SIPUserAgent? _userAgent;
+
+    // Per-call state
+    private AzureSpeechPipeline? _speechPipeline;
+    private string? _sipAgentHandle;
 
     public bool IsRegistered { get; private set; }
     public string? RegisteredServer { get; private set; }
@@ -34,16 +46,25 @@ public sealed class SipRegistrationService : IDisposable
     public SipRegistrationService(
         IDataProtectionProvider dataProtection,
         OpenCaddisConfigService configService,
+        IClientContextFactory clientContextFactory,
+        ILoggerFactory loggerFactory,
         ILogger<SipRegistrationService> logger)
     {
         _protector = dataProtection.CreateProtector("OpenCaddis.SipPhone");
+        _azureSpeechProtector = dataProtection.CreateProtector("OpenCaddis.AzureSpeech");
         _configService = configService;
+        _clientContextFactory = clientContextFactory;
+        _loggerFactory = loggerFactory;
         _logger = logger;
     }
 
     public string EncryptPassword(string plainText) => _protector.Protect(plainText);
 
     public string DecryptPassword(string encrypted) => _protector.Unprotect(encrypted);
+
+    public string EncryptSpeechKey(string plainText) => _azureSpeechProtector.Protect(plainText);
+
+    public string DecryptSpeechKey(string encrypted) => _azureSpeechProtector.Unprotect(encrypted);
 
     public async Task StartRegistrationAsync(SipConfigurationDto config)
     {
@@ -194,6 +215,9 @@ public sealed class SipRegistrationService : IDisposable
                         CallId = req.Header.CallId;
                         _logger.LogInformation("Call answered from {From}", ActiveCallFrom);
                         OnCallStateChanged?.Invoke();
+
+                        // Create per-call SipAgent and start STT pipeline
+                        await StartCallPipelineAsync(CallId, mediaSession);
                     }
                     else
                     {
@@ -213,6 +237,10 @@ public sealed class SipRegistrationService : IDisposable
                 ActiveCallFrom = null;
                 CallStartTime = null;
                 CallId = null;
+
+                // Clean up speech pipeline (fire-and-forget since this is a sync handler)
+                _ = Task.Run(async () => await StopCallPipelineAsync());
+
                 OnCallStateChanged?.Invoke();
             };
         }
@@ -226,6 +254,110 @@ public sealed class SipRegistrationService : IDisposable
         }
     }
 
+    private async Task StartCallPipelineAsync(string callId, VoIPMediaSession mediaSession)
+    {
+        try
+        {
+            // Create per-call SipAgent
+            var shortId = callId.Length > 8 ? callId[..8] : callId;
+            var agentHandle = $"sip-{shortId}";
+            var context = await _clientContextFactory.GetOrCreateAsync(UserHandle);
+            await context.CreateAgent(new AgentConfiguration
+            {
+                Handle = agentHandle,
+                AgentType = "sip",
+                Models = "default",
+                SystemPrompt = "You are an AI assistant handling a live phone call. You receive transcribed speech from the caller. Respond concisely and conversationally."
+            });
+            _sipAgentHandle = $"{UserHandle}:{agentHandle}";
+            _logger.LogInformation("Created SipAgent '{Handle}' for call {CallId}", _sipAgentHandle, callId);
+
+            // Start Azure Speech pipeline if configured
+            var ocConfig = await _configService.LoadConfigurationAsync();
+            if (ocConfig.AzureSpeech is { Region.Length: > 0, EncryptedKey.Length: > 0 })
+            {
+                var speechKey = DecryptSpeechKey(ocConfig.AzureSpeech.EncryptedKey);
+                var pipelineLogger = _loggerFactory.CreateLogger<AzureSpeechPipeline>();
+                _speechPipeline = new AzureSpeechPipeline(speechKey, ocConfig.AzureSpeech.Region, callId, pipelineLogger);
+
+                _speechPipeline.OnTranscriptionResult += (text) =>
+                {
+                    _ = Task.Run(async () =>
+                    {
+                        try
+                        {
+                            await context.SendMessage(new AgentMessage
+                            {
+                                ToHandle = _sipAgentHandle,
+                                FromHandle = UserHandle,
+                                Message = text,
+                                Kind = MessageKind.Request
+                            });
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogError(ex, "Failed to send transcription to SipAgent");
+                        }
+                    });
+                };
+
+                _speechPipeline.OnError += (error) =>
+                {
+                    _logger.LogError("Azure Speech pipeline error for call {CallId}: {Error}", callId, error);
+                };
+
+                await _speechPipeline.StartAsync();
+            }
+            else
+            {
+                _logger.LogWarning("Azure Speech not configured — call {CallId} will not have STT", callId);
+            }
+
+            // Hook RTP audio decoding
+            mediaSession.OnRtpPacketReceived += (ep, mediaType, rtpPacket) =>
+            {
+                if (mediaType != SDPMediaTypesEnum.audio || _speechPipeline is null) return;
+
+                var payload = rtpPacket.Payload;
+                var pcmBytes = new byte[payload.Length * 2];
+                var pt = rtpPacket.Header.PayloadType;
+
+                for (int i = 0; i < payload.Length; i++)
+                {
+                    short sample = pt == 8  // PCMA (A-law)
+                        ? ALawDecoder.ALawToLinearSample(payload[i])
+                        : MuLawDecoder.MuLawToLinearSample(payload[i]);  // PCMU (mu-law) default
+                    pcmBytes[i * 2] = (byte)(sample & 0xFF);
+                    pcmBytes[i * 2 + 1] = (byte)((sample >> 8) & 0xFF);
+                }
+
+                _speechPipeline.PushAudio(pcmBytes, pcmBytes.Length);
+            };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to start call pipeline for {CallId}", callId);
+        }
+    }
+
+    private async Task StopCallPipelineAsync()
+    {
+        try
+        {
+            if (_speechPipeline is not null)
+            {
+                await _speechPipeline.DisposeAsync();
+                _speechPipeline = null;
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Error disposing speech pipeline");
+        }
+
+        _sipAgentHandle = null;
+    }
+
     public void HangupCall()
     {
         if (_userAgent is not null && IsInCall)
@@ -235,6 +367,7 @@ public sealed class SipRegistrationService : IDisposable
             ActiveCallFrom = null;
             CallStartTime = null;
             CallId = null;
+            _ = Task.Run(async () => await StopCallPipelineAsync());
             _logger.LogInformation("Call hung up by user");
             OnCallStateChanged?.Invoke();
         }
@@ -244,6 +377,14 @@ public sealed class SipRegistrationService : IDisposable
     {
         try
         {
+            // Clean up call pipeline synchronously (best-effort)
+            if (_speechPipeline is not null)
+            {
+                _speechPipeline.DisposeAsync().AsTask().GetAwaiter().GetResult();
+                _speechPipeline = null;
+            }
+            _sipAgentHandle = null;
+
             if (_userAgent is not null)
             {
                 if (IsInCall) _userAgent.Hangup();

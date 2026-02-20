@@ -7,6 +7,7 @@ public class OpenCaddisConfigurationDto
     public List<AgentConfigurationDto> Agents { get; set; } = [];
     public Microsoft365ConfigurationDto? Microsoft365 { get; set; }
     public SipConfigurationDto? SipPhone { get; set; }
+    public AzureSpeechConfigurationDto? AzureSpeech { get; set; }
 }
 
 public class Microsoft365ConfigurationDto
@@ -27,6 +28,13 @@ public class SipConfigurationDto
     public string? EncryptedPassword { get; set; }
     public string? Extension { get; set; }
     public string? DisplayName { get; set; }
+}
+
+public class AzureSpeechConfigurationDto
+{
+    public string Endpoint { get; set; } = string.Empty;
+    public string Region { get; set; } = string.Empty;
+    public string? EncryptedKey { get; set; }
 }
 
 public class AgentConfigurationDto
