@@ -67,9 +67,12 @@ public class AssistantAgent : FabrAgentProxy
                 $"Compacted history: {compaction.OriginalMessageCount} → {compaction.CompactedMessageCount} messages");
         }
 
+        var isReminder = message.MessageType?.StartsWith("reminder:") == true;
+
         try
         {
-            var result = await agent!.RunAsync(message.Message ?? string.Empty, session);
+            var inputText = FormatReminderMessage(message) ?? message.Message ?? string.Empty;
+            var result = await agent!.RunAsync(inputText, session);
             response.Message = result.Text ?? "No response";
 
             logger.LogInformation(
@@ -82,7 +85,56 @@ public class AssistantAgent : FabrAgentProxy
             response.Message = $"Error: {ex.Message}";
         }
 
+        if (isReminder)
+        {
+            // Reminder messages are self-sent (FromHandle == ToHandle), so the OnMessage
+            // return value goes back to the agent, not the user. Send the response to the
+            // client explicitly so it appears in the UI.
+            if (ThinkingNotifier.TryGetClientHandle(myHandle, out var clientHandle))
+            {
+                await fabrAgentHost.SendMessage(new AgentMessage
+                {
+                    ToHandle = clientHandle,
+                    FromHandle = myHandle,
+                    Kind = MessageKind.OneWay,
+                    Message = response.Message
+                });
+            }
+
+            // Auto-unregister one-shot reminders after the first tick
+            if (message.MessageType?.Contains(":oneshot") == true)
+            {
+                var reminderName = message.Args?.GetValueOrDefault("reminderName");
+                if (reminderName is not null)
+                {
+                    try
+                    {
+                        await fabrAgentHost.UnregisterReminder(reminderName);
+                        logger.LogInformation("Auto-unregistered one-shot reminder '{ReminderName}'", reminderName);
+                    }
+                    catch (Exception ex)
+                    {
+                        logger.LogWarning(ex, "Failed to auto-unregister one-shot reminder '{ReminderName}'", reminderName);
+                    }
+                }
+            }
+        }
+
         return response;
+    }
+
+    private static string? FormatReminderMessage(AgentMessage message)
+    {
+        if (message.MessageType is null || !message.MessageType.StartsWith("reminder:"))
+            return null;
+
+        var content = message.Message ?? string.Empty;
+
+        // messageType is "reminder:action", "reminder:action:oneshot", "reminder:notify", "reminder:notify:oneshot"
+        if (message.MessageType.Contains(":action"))
+            return $"[REMINDER TRIGGERED] You have a scheduled task to execute autonomously. Use your available tools to carry out the following instructions:\n{content}";
+
+        return $"[REMINDER TRIGGERED] You have a scheduled reminder. Notify the user with the following message using the SendNotification tool:\n\"{content}\"";
     }
 
     private static string Truncate(string text, int maxLength) =>

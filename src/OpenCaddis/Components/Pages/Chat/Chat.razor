@@ -43,8 +43,11 @@
 @code {
     private const string UserHandle = "opencaddis-user";
 
+    private const int KeepAliveIntervalMs = 120_000; // 2 minutes
+
     private IClientContext? _context;
     private IJSObjectReference? _jsModule;
+    private DotNetObjectReference<Chat>? _dotNetRef;
 
     private List<ChatAgent> _conversations = [];
     private ChatAgent? _selectedConversation;
@@ -79,6 +82,9 @@
         {
             _jsModule = await JS.InvokeAsync<IJSObjectReference>("import",
                 "./Components/Pages/Chat/Chat.razor.js");
+
+            _dotNetRef = DotNetObjectReference.Create(this);
+            await _jsModule.InvokeVoidAsync("startKeepAlive", _dotNetRef, KeepAliveIntervalMs);
         }
 
         if (_shouldScrollToBottom && _jsModule is not null)
@@ -339,6 +345,26 @@
         StateHasChanged();
     }
 
+    [JSInvokable]
+    public async Task OnKeepAliveTick()
+    {
+        if (_context is null) return;
+
+        // Call GetAgentHealth on any known agent to trigger RefreshObserverIfNeeded
+        // inside ClientContext, keeping the observer subscription alive.
+        var handle = _selectedConversation?.Handle ?? _conversations.FirstOrDefault()?.Handle;
+        if (handle is null) return;
+
+        try
+        {
+            await _context.GetAgentHealth(handle);
+        }
+        catch
+        {
+            // Best-effort keep-alive; failures are non-fatal
+        }
+    }
+
     public async ValueTask DisposeAsync()
     {
         if (_context is not null)
@@ -350,6 +376,7 @@
         {
             try
             {
+                await _jsModule.InvokeVoidAsync("stopKeepAlive");
                 await _jsModule.DisposeAsync();
             }
             catch (JSDisconnectedException)
@@ -357,5 +384,7 @@
                 // Circuit already disconnected
             }
         }
+
+        _dotNetRef?.Dispose();
     }
 }
