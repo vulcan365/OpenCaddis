@@ -1,0 +1,53 @@
+@rendermode InteractiveServer
+@inject IJSRuntime JS
+
+@if (_visible)
+{
+    <div class="terms-overlay">
+        <div class="terms-modal">
+            <h4 class="terms-title">Before You Continue</h4>
+
+            <div class="terms-body">
+                <p>
+                    <strong>OpenCaddis is experimental software.</strong> It can execute code, manage files,
+                    and interact with external services on your behalf.
+                </p>
+                <p>
+                    You are responsible for reviewing agent actions and understanding the risks involved.
+                    There is no warranty — use at your own risk.
+                </p>
+            </div>
+
+            <button class="btn btn-primary terms-accept-btn" @onclick="HandleAccept">
+                I Understand &amp; Accept
+            </button>
+        </div>
+    </div>
+}
+
+@code {
+    private bool _visible;
+
+    private const string StorageKey = "oc-terms-accepted-date";
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            var today = DateTime.UtcNow.ToString("yyyy-MM-dd");
+            var stored = await JS.InvokeAsync<string?>("localStorage.getItem", StorageKey);
+            if (stored != today)
+            {
+                _visible = true;
+                StateHasChanged();
+            }
+        }
+    }
+
+    private async Task HandleAccept()
+    {
+        var today = DateTime.UtcNow.ToString("yyyy-MM-dd");
+        await JS.InvokeVoidAsync("localStorage.setItem", StorageKey, today);
+        _visible = false;
+    }
+}
