@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Sockets;
 using Microsoft.AspNetCore.DataProtection;
+using SIPSorcery.Media;
 using SIPSorcery.SIP;
 using SIPSorcery.SIP.App;
 
@@ -14,6 +15,7 @@ public sealed class SipRegistrationService : IDisposable
 
     private SIPTransport? _transport;
     private SIPRegistrationUserAgent? _regAgent;
+    private SIPUserAgent? _userAgent;
 
     public bool IsRegistered { get; private set; }
     public string? RegisteredServer { get; private set; }
@@ -21,7 +23,13 @@ public sealed class SipRegistrationService : IDisposable
     public string? LastError { get; private set; }
     public DateTimeOffset? LastRegistrationTime { get; private set; }
 
+    public bool IsInCall { get; private set; }
+    public string? ActiveCallFrom { get; private set; }
+    public DateTimeOffset? CallStartTime { get; private set; }
+    public string? CallId { get; private set; }
+
     public event Action? OnConnectionChanged;
+    public event Action? OnCallStateChanged;
 
     public SipRegistrationService(
         IDataProtectionProvider dataProtection,
@@ -163,6 +171,50 @@ public sealed class SipRegistrationService : IDisposable
             _regAgent.Start();
             _logger.LogInformation("SIP registration started for {User}@{Domain} (proxy: {Proxy}:{Port}, transport: {Transport})",
                 config.Username, config.Domain, config.OutboundProxy ?? config.Domain, config.Port, config.Transport);
+
+            _userAgent = new SIPUserAgent(_transport, null, true, null);
+
+            _userAgent.OnIncomingCall += async (ua, req) =>
+            {
+                try
+                {
+                    _logger.LogInformation("Incoming call from {From}", req.Header.From.FriendlyDescription());
+
+                    var uas = ua.AcceptCall(req);
+
+                    var mediaSession = new VoIPMediaSession();
+                    mediaSession.AcceptRtpFromAny = true;
+
+                    var answered = await ua.Answer(uas, mediaSession);
+                    if (answered)
+                    {
+                        IsInCall = true;
+                        ActiveCallFrom = req.Header.From.FriendlyDescription();
+                        CallStartTime = DateTimeOffset.UtcNow;
+                        CallId = req.Header.CallId;
+                        _logger.LogInformation("Call answered from {From}", ActiveCallFrom);
+                        OnCallStateChanged?.Invoke();
+                    }
+                    else
+                    {
+                        _logger.LogWarning("Failed to answer call from {From}", req.Header.From.FriendlyDescription());
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Error handling incoming call");
+                }
+            };
+
+            _userAgent.OnCallHungup += (dialogue) =>
+            {
+                _logger.LogInformation("Call ended: {CallId}", dialogue?.CallId);
+                IsInCall = false;
+                ActiveCallFrom = null;
+                CallStartTime = null;
+                CallId = null;
+                OnCallStateChanged?.Invoke();
+            };
         }
         catch (Exception ex)
         {
@@ -174,10 +226,31 @@ public sealed class SipRegistrationService : IDisposable
         }
     }
 
+    public void HangupCall()
+    {
+        if (_userAgent is not null && IsInCall)
+        {
+            _userAgent.Hangup();
+            IsInCall = false;
+            ActiveCallFrom = null;
+            CallStartTime = null;
+            CallId = null;
+            _logger.LogInformation("Call hung up by user");
+            OnCallStateChanged?.Invoke();
+        }
+    }
+
     public void Stop()
     {
         try
         {
+            if (_userAgent is not null)
+            {
+                if (IsInCall) _userAgent.Hangup();
+                _userAgent.Dispose();
+                _userAgent = null;
+            }
+
             if (_regAgent is not null)
             {
                 _regAgent.Stop(sendZeroExpiryRegister: false);
@@ -200,6 +273,10 @@ public sealed class SipRegistrationService : IDisposable
         RegisteredUser = null;
         LastError = null;
         LastRegistrationTime = null;
+        IsInCall = false;
+        ActiveCallFrom = null;
+        CallStartTime = null;
+        CallId = null;
         OnConnectionChanged?.Invoke();
     }
 

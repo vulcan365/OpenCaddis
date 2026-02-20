@@ -242,6 +242,45 @@
             </div>
         </div>
     </section>
+
+    @* === Call Status === *@
+    @if (SipService.IsRegistered)
+    {
+        <section>
+            <h5 class="fw-semibold mb-1">Call Status</h5>
+            <p class="text-body-secondary small mb-3">Incoming call handling for the registered SIP extension.</p>
+
+            <div class="card">
+                <div class="card-body">
+                    @if (SipService.IsInCall)
+                    {
+                        <div class="d-flex align-items-center gap-2 mb-3">
+                            <span class="badge bg-success">In Call</span>
+                            <span class="fw-semibold">@SipService.ActiveCallFrom</span>
+                        </div>
+
+                        @if (SipService.CallStartTime is not null)
+                        {
+                            <p class="text-body-secondary small mb-3">
+                                Started: @SipService.CallStartTime.Value.LocalDateTime.ToString("g")
+                            </p>
+                        }
+
+                        <button class="btn btn-outline-danger btn-sm" @onclick="HangupCall">
+                            <i class="bi bi-telephone-x me-1"></i> Hang Up
+                        </button>
+                    }
+                    else
+                    {
+                        <div class="d-flex align-items-center gap-2 mb-3">
+                            <span class="badge bg-secondary">Idle</span>
+                            <span class="text-body-secondary">No active call</span>
+                        </div>
+                    }
+                </div>
+            </div>
+        </section>
+    }
 </div>
 
 @code {
@@ -265,6 +304,7 @@
     {
         AuthService.OnConnectionChanged += HandleConnectionChanged;
         SipService.OnConnectionChanged += HandleConnectionChanged;
+        SipService.OnCallStateChanged += HandleConnectionChanged;
 
         if (ConfigService.ConfigurationExists())
         {
@@ -381,6 +421,11 @@
         SipService.Stop();
     }
 
+    private void HangupCall()
+    {
+        SipService.HangupCall();
+    }
+
     private void HandleConnectionChanged()
     {
         InvokeAsync(StateHasChanged);
@@ -390,5 +435,6 @@
     {
         AuthService.OnConnectionChanged -= HandleConnectionChanged;
         SipService.OnConnectionChanged -= HandleConnectionChanged;
+        SipService.OnCallStateChanged -= HandleConnectionChanged;
     }
 }
