@@ -1,4 +1,6 @@
 using System.ComponentModel.DataAnnotations;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace OpenCaddis.Services;
 
@@ -6,8 +8,9 @@ public class OpenCaddisConfigurationDto
 {
     public List<AgentConfigurationDto> Agents { get; set; } = [];
     public Microsoft365ConfigurationDto? Microsoft365 { get; set; }
-    public SipConfigurationDto? SipPhone { get; set; }
-    public AzureSpeechConfigurationDto? AzureSpeech { get; set; }
+
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? ExtensionData { get; set; }
 }
 
 public class Microsoft365ConfigurationDto
@@ -16,27 +19,6 @@ public class Microsoft365ConfigurationDto
     public string? EncryptedTokens { get; set; }
     public string? UserDisplayName { get; set; }
     public string? UserEmail { get; set; }
-}
-
-public class SipConfigurationDto
-{
-    public string Domain { get; set; } = string.Empty;
-    public string? OutboundProxy { get; set; }
-    public int Port { get; set; } = 5060;
-    public string Transport { get; set; } = "udp";
-    public string Username { get; set; } = string.Empty;
-    public string? EncryptedPassword { get; set; }
-    public string? Extension { get; set; }
-    public string? DisplayName { get; set; }
-    public string? AnswerGreeting { get; set; }
-}
-
-public class AzureSpeechConfigurationDto
-{
-    public string Endpoint { get; set; } = string.Empty;
-    public string Region { get; set; } = string.Empty;
-    public string? EncryptedKey { get; set; }
-    public string VoiceName { get; set; } = "en-US-JennyNeural";
 }
 
 public class AgentConfigurationDto

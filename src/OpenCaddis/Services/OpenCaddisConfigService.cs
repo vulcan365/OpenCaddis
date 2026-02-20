@@ -1,8 +1,9 @@
 using System.Text.Json;
+using OpenCaddis.Sdk;
 
 namespace OpenCaddis.Services;
 
-public class OpenCaddisConfigService
+public class OpenCaddisConfigService : ICaddisConfigService
 {
     private static readonly JsonSerializerOptions SerializerOptions = new()
     {
@@ -29,5 +30,24 @@ public class OpenCaddisConfigService
     {
         var json = JsonSerializer.Serialize(configuration, SerializerOptions);
         await File.WriteAllTextAsync(_configPath, json);
+    }
+
+    public async Task<T?> GetAddonConfigAsync<T>(string sectionName) where T : class
+    {
+        if (!ConfigurationExists()) return null;
+        var config = await LoadConfigurationAsync();
+        if (config.ExtensionData?.TryGetValue(sectionName, out var element) == true)
+            return element.Deserialize<T>(SerializerOptions);
+        return null;
+    }
+
+    public async Task SetAddonConfigAsync<T>(string sectionName, T value) where T : class
+    {
+        var config = ConfigurationExists()
+            ? await LoadConfigurationAsync()
+            : new OpenCaddisConfigurationDto();
+        config.ExtensionData ??= new();
+        config.ExtensionData[sectionName] = JsonSerializer.SerializeToElement(value, SerializerOptions);
+        await SaveConfigurationAsync(config);
     }
 }

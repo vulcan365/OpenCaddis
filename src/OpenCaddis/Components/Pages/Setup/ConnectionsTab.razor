@@ -1,5 +1,6 @@
+@using System.Reflection
+@using OpenCaddis.Sdk
 @inject Microsoft365AuthService AuthService
-@inject SipRegistrationService SipService
 @inject OpenCaddisConfigService ConfigService
 @inject IJSRuntime JS
 @implements IDisposable
@@ -135,193 +136,10 @@
         </div>
     </section>
 
-    @* === SIP Phone Settings === *@
-    <section>
-        <h5 class="fw-semibold mb-1">SIP Phone Settings</h5>
-        <p class="text-body-secondary small mb-3">SIP registration for voice connectivity.</p>
-
-        <div class="card">
-            <div class="card-body">
-                <div class="row g-3">
-                    <div class="col-12">
-                        <label class="form-label">SIP Domain</label>
-                        <input @bind="_sipDomain" class="form-control" placeholder="domain.example.service" />
-                    </div>
-                    <div class="col-12">
-                        <label class="form-label">Outbound Proxy <span class="text-body-secondary">(optional)</span></label>
-                        <input @bind="_sipOutboundProxy" class="form-control" placeholder="proxy.example.com" />
-                    </div>
-                    <div class="col-md-4">
-                        <label class="form-label">Port</label>
-                        <input @bind="_sipPort" type="number" class="form-control" />
-                    </div>
-                    <div class="col-md-4">
-                        <label class="form-label">Transport</label>
-                        <select @bind="_sipTransport" class="form-select">
-                            <option value="udp">UDP</option>
-                            <option value="tcp">TCP</option>
-                        </select>
-                    </div>
-                    <div class="col-md-6">
-                        <label class="form-label">Username</label>
-                        <input @bind="_sipUsername" class="form-control" placeholder="SIP username or extension" />
-                    </div>
-                    <div class="col-md-6">
-                        <label class="form-label">Password</label>
-                        <input @bind="_sipPassword" type="password" class="form-control" placeholder="@(_hasSavedSipPassword ? "(saved — leave blank to keep)" : "")" />
-                    </div>
-                    <div class="col-md-6">
-                        <label class="form-label">Extension <span class="text-body-secondary">(optional)</span></label>
-                        <input @bind="_sipExtension" class="form-control" placeholder="Extension number" />
-                    </div>
-                    <div class="col-md-6">
-                        <label class="form-label">Display Name <span class="text-body-secondary">(optional)</span></label>
-                        <input @bind="_sipDisplayName" class="form-control" placeholder="Caller display name" />
-                    </div>
-                    <div class="col-12">
-                        <label class="form-label">Answer Greeting <span class="text-body-secondary">(optional)</span></label>
-                        <input @bind="_sipAnswerGreeting" class="form-control" placeholder="Hello, how can I help you today?" />
-                    </div>
-                </div>
-                <div class="d-flex justify-content-end mt-3">
-                    <button class="btn btn-primary btn-sm" @onclick="SaveSipSettings">
-                        <i class="bi bi-save me-1"></i> Save Settings
-                    </button>
-                </div>
-                @if (_sipSettingsSaved)
-                {
-                    <div class="alert alert-success mt-3 mb-0 py-2">SIP settings saved.</div>
-                }
-            </div>
-        </div>
-    </section>
-
-    @* === Azure Speech Settings === *@
-    <section>
-        <h5 class="fw-semibold mb-1">Azure Speech Settings</h5>
-        <p class="text-body-secondary small mb-3">Azure Cognitive Services Speech for call transcription (STT).</p>
-
-        <div class="card">
-            <div class="card-body">
-                <div class="row g-3">
-                    <div class="col-12">
-                        <label class="form-label">Endpoint <span class="text-body-secondary">(reference)</span></label>
-                        <input @bind="_azureSpeechEndpoint" class="form-control" placeholder="https://your-resource.cognitiveservices.azure.com/" />
-                    </div>
-                    <div class="col-md-6">
-                        <label class="form-label">Region</label>
-                        <input @bind="_azureSpeechRegion" class="form-control" placeholder="eastus2" />
-                    </div>
-                    <div class="col-md-6">
-                        <label class="form-label">API Key</label>
-                        <input @bind="_azureSpeechKey" type="password" class="form-control" placeholder="@(_hasSavedAzureSpeechKey ? "(saved — leave blank to keep)" : "")" />
-                    </div>
-                    <div class="col-md-6">
-                        <label class="form-label">Voice Name</label>
-                        <input @bind="_azureSpeechVoiceName" class="form-control" placeholder="en-US-JennyNeural" />
-                    </div>
-                </div>
-                <div class="d-flex justify-content-end mt-3">
-                    <button class="btn btn-primary btn-sm" @onclick="SaveAzureSpeechSettings">
-                        <i class="bi bi-save me-1"></i> Save Settings
-                    </button>
-                </div>
-                @if (_azureSpeechSettingsSaved)
-                {
-                    <div class="alert alert-success mt-3 mb-0 py-2">Azure Speech settings saved.</div>
-                }
-            </div>
-        </div>
-    </section>
-
-    @* === SIP Registration Status === *@
-    <section>
-        <h5 class="fw-semibold mb-1">SIP Registration Status</h5>
-        <p class="text-body-secondary small mb-3">Register with the SIP server to enable voice calls.</p>
-
-        <div class="card">
-            <div class="card-body">
-                @if (SipService.IsRegistered)
-                {
-                    <div class="d-flex align-items-center gap-2 mb-3">
-                        <span class="badge bg-success">Registered</span>
-                        <span class="fw-semibold">@SipService.RegisteredUser</span>
-                        <span class="text-body-secondary">on @SipService.RegisteredServer</span>
-                    </div>
-
-                    @if (SipService.LastRegistrationTime is not null)
-                    {
-                        <p class="text-body-secondary small mb-3">
-                            Last registered: @SipService.LastRegistrationTime.Value.LocalDateTime.ToString("g")
-                        </p>
-                    }
-
-                    <button class="btn btn-outline-danger btn-sm" @onclick="StopSipRegistration">
-                        <i class="bi bi-x-circle me-1"></i> Unregister
-                    </button>
-                }
-                else
-                {
-                    <div class="d-flex align-items-center gap-2 mb-3">
-                        <span class="badge bg-warning text-dark">Not registered</span>
-                    </div>
-
-                    @if (SipService.LastError is not null)
-                    {
-                        <div class="alert alert-danger mb-3 py-2">@SipService.LastError</div>
-                    }
-
-                    <button class="btn btn-primary btn-sm" @onclick="StartSipRegistration"
-                            disabled="@string.IsNullOrEmpty(_sipDomain)">
-                        <i class="bi bi-telephone me-1"></i> Register
-                    </button>
-
-                    @if (string.IsNullOrEmpty(_sipDomain))
-                    {
-                        <p class="text-body-secondary small mt-2 mb-0">Save your SIP settings above first.</p>
-                    }
-                }
-            </div>
-        </div>
-    </section>
-
-    @* === Call Status === *@
-    @if (SipService.IsRegistered)
+    @* === Addon Settings (auto-discovered) === *@
+    @foreach (var component in _addonSettingsComponents)
     {
-        <section>
-            <h5 class="fw-semibold mb-1">Call Status</h5>
-            <p class="text-body-secondary small mb-3">Incoming call handling for the registered SIP extension.</p>
-
-            <div class="card">
-                <div class="card-body">
-                    @if (SipService.IsInCall)
-                    {
-                        <div class="d-flex align-items-center gap-2 mb-3">
-                            <span class="badge bg-success">In Call</span>
-                            <span class="fw-semibold">@SipService.ActiveCallFrom</span>
-                        </div>
-
-                        @if (SipService.CallStartTime is not null)
-                        {
-                            <p class="text-body-secondary small mb-3">
-                                Started: @SipService.CallStartTime.Value.LocalDateTime.ToString("g")
-                            </p>
-                        }
-
-                        <button class="btn btn-outline-danger btn-sm" @onclick="HangupCall">
-                            <i class="bi bi-telephone-x me-1"></i> Hang Up
-                        </button>
-                    }
-                    else
-                    {
-                        <div class="d-flex align-items-center gap-2 mb-3">
-                            <span class="badge bg-secondary">Idle</span>
-                            <span class="text-body-secondary">No active call</span>
-                        </div>
-                    }
-                </div>
-            </div>
-        </section>
+        <DynamicComponent Type="component" />
     }
 </div>
 
@@ -330,32 +148,21 @@
     private bool _settingsSaved;
     private string? _connectError;
 
-    // SIP fields
-    private string _sipDomain = "";
-    private string _sipOutboundProxy = "";
-    private int _sipPort = 5060;
-    private string _sipTransport = "udp";
-    private string _sipUsername = "";
-    private string _sipPassword = "";
-    private string _sipExtension = "";
-    private string _sipDisplayName = "";
-    private string _sipAnswerGreeting = "";
-    private bool _sipSettingsSaved;
-    private bool _hasSavedSipPassword;
-
-    // Azure Speech fields
-    private string _azureSpeechEndpoint = "";
-    private string _azureSpeechRegion = "";
-    private string _azureSpeechKey = "";
-    private string _azureSpeechVoiceName = "en-US-JennyNeural";
-    private bool _azureSpeechSettingsSaved;
-    private bool _hasSavedAzureSpeechKey;
+    private List<Type> _addonSettingsComponents = [];
 
     protected override async Task OnInitializedAsync()
     {
         AuthService.OnConnectionChanged += HandleConnectionChanged;
-        SipService.OnConnectionChanged += HandleConnectionChanged;
-        SipService.OnCallStateChanged += HandleConnectionChanged;
+
+        // Discover addon settings components
+        _addonSettingsComponents = AppDomain.CurrentDomain.GetAssemblies()
+            .SelectMany(a => { try { return a.GetTypes(); } catch { return []; } })
+            .Where(t => t.GetCustomAttribute<CaddisAddonAttribute>() is not null
+                         && typeof(ICaddisAddon).IsAssignableFrom(t))
+            .Select(t => ((ICaddisAddon)Activator.CreateInstance(t)!).SettingsComponentType)
+            .Where(t => t is not null)
+            .Cast<Type>()
+            .ToList();
 
         if (ConfigService.ConfigurationExists())
         {
@@ -363,27 +170,6 @@
             if (config.Microsoft365 is { ClientId.Length: > 0 })
             {
                 _clientId = config.Microsoft365.ClientId;
-            }
-
-            if (config.SipPhone is not null)
-            {
-                _sipDomain = config.SipPhone.Domain;
-                _sipOutboundProxy = config.SipPhone.OutboundProxy ?? "";
-                _sipPort = config.SipPhone.Port;
-                _sipTransport = config.SipPhone.Transport;
-                _sipUsername = config.SipPhone.Username;
-                _sipExtension = config.SipPhone.Extension ?? "";
-                _sipDisplayName = config.SipPhone.DisplayName ?? "";
-                _sipAnswerGreeting = config.SipPhone.AnswerGreeting ?? "";
-                _hasSavedSipPassword = !string.IsNullOrEmpty(config.SipPhone.EncryptedPassword);
-            }
-
-            if (config.AzureSpeech is not null)
-            {
-                _azureSpeechEndpoint = config.AzureSpeech.Endpoint;
-                _azureSpeechRegion = config.AzureSpeech.Region;
-                _azureSpeechVoiceName = config.AzureSpeech.VoiceName;
-                _hasSavedAzureSpeechKey = !string.IsNullOrEmpty(config.AzureSpeech.EncryptedKey);
             }
         }
     }
@@ -436,81 +222,6 @@
         }
     }
 
-    private async Task SaveSipSettings()
-    {
-        _sipSettingsSaved = false;
-
-        var config = ConfigService.ConfigurationExists()
-            ? await ConfigService.LoadConfigurationAsync()
-            : new OpenCaddisConfigurationDto();
-
-        config.SipPhone ??= new SipConfigurationDto();
-        config.SipPhone.Domain = _sipDomain;
-        config.SipPhone.OutboundProxy = string.IsNullOrWhiteSpace(_sipOutboundProxy) ? null : _sipOutboundProxy;
-        config.SipPhone.Port = _sipPort;
-        config.SipPhone.Transport = _sipTransport;
-        config.SipPhone.Username = _sipUsername;
-        config.SipPhone.Extension = string.IsNullOrWhiteSpace(_sipExtension) ? null : _sipExtension;
-        config.SipPhone.DisplayName = string.IsNullOrWhiteSpace(_sipDisplayName) ? null : _sipDisplayName;
-        config.SipPhone.AnswerGreeting = string.IsNullOrWhiteSpace(_sipAnswerGreeting) ? null : _sipAnswerGreeting;
-
-        if (!string.IsNullOrEmpty(_sipPassword))
-        {
-            config.SipPhone.EncryptedPassword = SipService.EncryptPassword(_sipPassword);
-            _hasSavedSipPassword = true;
-            _sipPassword = "";
-        }
-
-        await ConfigService.SaveConfigurationAsync(config);
-        _sipSettingsSaved = true;
-    }
-
-    private async Task SaveAzureSpeechSettings()
-    {
-        _azureSpeechSettingsSaved = false;
-
-        var config = ConfigService.ConfigurationExists()
-            ? await ConfigService.LoadConfigurationAsync()
-            : new OpenCaddisConfigurationDto();
-
-        config.AzureSpeech ??= new AzureSpeechConfigurationDto();
-        config.AzureSpeech.Endpoint = _azureSpeechEndpoint;
-        config.AzureSpeech.Region = _azureSpeechRegion;
-        config.AzureSpeech.VoiceName = string.IsNullOrWhiteSpace(_azureSpeechVoiceName) ? "en-US-JennyNeural" : _azureSpeechVoiceName;
-
-        if (!string.IsNullOrEmpty(_azureSpeechKey))
-        {
-            config.AzureSpeech.EncryptedKey = SipService.EncryptSpeechKey(_azureSpeechKey);
-            _hasSavedAzureSpeechKey = true;
-            _azureSpeechKey = "";
-        }
-
-        await ConfigService.SaveConfigurationAsync(config);
-        _azureSpeechSettingsSaved = true;
-    }
-
-    private async Task StartSipRegistration()
-    {
-        await SaveSipSettings();
-        _sipSettingsSaved = false;
-
-        var config = await ConfigService.LoadConfigurationAsync();
-        if (config.SipPhone is not null)
-        {
-            await SipService.StartRegistrationAsync(config.SipPhone);
-        }
-    }
-
-    private void StopSipRegistration()
-    {
-        SipService.Stop();
-    }
-
-    private void HangupCall()
-    {
-        SipService.HangupCall();
-    }
-
     private void HandleConnectionChanged()
     {
         InvokeAsync(StateHasChanged);
@@ -519,7 +230,5 @@
     public void Dispose()
     {
         AuthService.OnConnectionChanged -= HandleConnectionChanged;
-        SipService.OnConnectionChanged -= HandleConnectionChanged;
-        SipService.OnCallStateChanged -= HandleConnectionChanged;
     }
 }
