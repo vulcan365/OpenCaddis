@@ -7,6 +7,7 @@ using SIPSorcery.Media;
 using SIPSorcery.Net;
 using SIPSorcery.SIP;
 using SIPSorcery.SIP.App;
+using SIPSorceryMedia.Abstractions;
 
 namespace OpenCaddis.Services;
 
@@ -27,7 +28,9 @@ public sealed class SipRegistrationService : IDisposable
 
     // Per-call state
     private AzureSpeechPipeline? _speechPipeline;
+    private VoIPMediaSession? _mediaSession;
     private string? _sipAgentHandle;
+    private readonly SemaphoreSlim _ttsSemaphore = new(1, 1);
 
     public bool IsRegistered { get; private set; }
     public string? RegisteredServer { get; private set; }
@@ -209,6 +212,7 @@ public sealed class SipRegistrationService : IDisposable
                     var answered = await ua.Answer(uas, mediaSession);
                     if (answered)
                     {
+                        mediaSession.AudioExtrasSource.SetSource(AudioSourcesEnum.Silence);
                         IsInCall = true;
                         ActiveCallFrom = req.Header.From.FriendlyDescription();
                         CallStartTime = DateTimeOffset.UtcNow;
@@ -258,6 +262,8 @@ public sealed class SipRegistrationService : IDisposable
     {
         try
         {
+            _mediaSession = mediaSession;
+
             // Create per-call SipAgent
             var shortId = callId.Length > 8 ? callId[..8] : callId;
             var agentHandle = $"sip-{shortId}";
@@ -277,26 +283,44 @@ public sealed class SipRegistrationService : IDisposable
             if (ocConfig.AzureSpeech is { Region.Length: > 0, EncryptedKey.Length: > 0 })
             {
                 var speechKey = DecryptSpeechKey(ocConfig.AzureSpeech.EncryptedKey);
+                var voiceName = ocConfig.AzureSpeech.VoiceName;
+                if (string.IsNullOrWhiteSpace(voiceName)) voiceName = "en-US-JennyNeural";
                 var pipelineLogger = _loggerFactory.CreateLogger<AzureSpeechPipeline>();
-                _speechPipeline = new AzureSpeechPipeline(speechKey, ocConfig.AzureSpeech.Region, callId, pipelineLogger);
+                _speechPipeline = new AzureSpeechPipeline(speechKey, ocConfig.AzureSpeech.Region, callId, pipelineLogger, voiceName);
 
                 _speechPipeline.OnTranscriptionResult += (text) =>
                 {
                     _ = Task.Run(async () =>
                     {
+                        await _ttsSemaphore.WaitAsync();
                         try
                         {
-                            await context.SendMessage(new AgentMessage
+                            var response = await context.SendAndReceiveMessage(new AgentMessage
                             {
                                 ToHandle = _sipAgentHandle,
                                 FromHandle = UserHandle,
                                 Message = text,
                                 Kind = MessageKind.Request
                             });
+
+                            if (!string.IsNullOrEmpty(response.Message) && _mediaSession is not null && _speechPipeline is not null)
+                            {
+                                var pcmAudio = await _speechPipeline.SynthesizeSpeechAsync(response.Message);
+                                if (pcmAudio is { Length: > 0 } && _mediaSession is not null)
+                                {
+                                    // Queue TTS audio through the existing silence timer — single timer,
+                                    // no dual-timer jitter that SendAudioFromStream causes.
+                                    await _mediaSession.AudioExtrasSource.QueueAllAudio(pcmAudio, 8000);
+                                }
+                            }
                         }
                         catch (Exception ex)
                         {
-                            _logger.LogError(ex, "Failed to send transcription to SipAgent");
+                            _logger.LogError(ex, "Failed to process transcription/TTS for call {CallId}", callId);
+                        }
+                        finally
+                        {
+                            _ttsSemaphore.Release();
                         }
                     });
                 };
@@ -307,6 +331,16 @@ public sealed class SipRegistrationService : IDisposable
                 };
 
                 await _speechPipeline.StartAsync();
+
+                // Play answer greeting if configured
+                if (!string.IsNullOrWhiteSpace(ocConfig.SipPhone?.AnswerGreeting) && _mediaSession is not null)
+                {
+                    var greetingAudio = await _speechPipeline.SynthesizeSpeechAsync(ocConfig.SipPhone.AnswerGreeting);
+                    if (greetingAudio is { Length: > 0 })
+                    {
+                        _ = _mediaSession.AudioExtrasSource.QueueAllAudio(greetingAudio, 8000);
+                    }
+                }
             }
             else
             {
@@ -355,6 +389,10 @@ public sealed class SipRegistrationService : IDisposable
             _logger.LogWarning(ex, "Error disposing speech pipeline");
         }
 
+        // Clear any pending TTS audio
+        _mediaSession?.AudioExtrasSource?.ClearQueuedAudio();
+
+        _mediaSession = null;
         _sipAgentHandle = null;
     }
 
@@ -383,6 +421,7 @@ public sealed class SipRegistrationService : IDisposable
                 _speechPipeline.DisposeAsync().AsTask().GetAwaiter().GetResult();
                 _speechPipeline = null;
             }
+            _mediaSession = null;
             _sipAgentHandle = null;
 
             if (_userAgent is not null)

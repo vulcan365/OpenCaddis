@@ -12,13 +12,14 @@ public sealed class AzureSpeechPipeline : IAsyncDisposable
     private readonly PushAudioInputStream _audioStream;
     private readonly AudioConfig _audioConfig;
     private readonly SpeechRecognizer _recognizer;
+    private readonly SpeechSynthesizer _synthesizer;
     private readonly string _callId;
     private readonly ILogger _logger;
 
     public event Action<string>? OnTranscriptionResult;
     public event Action<string>? OnError;
 
-    public AzureSpeechPipeline(string subscriptionKey, string region, string callId, ILogger logger)
+    public AzureSpeechPipeline(string subscriptionKey, string region, string callId, ILogger logger, string voiceName = "en-US-JennyNeural")
     {
         _callId = callId;
         _logger = logger;
@@ -30,6 +31,13 @@ public sealed class AzureSpeechPipeline : IAsyncDisposable
 
         var speechConfig = SpeechConfig.FromSubscription(subscriptionKey, region);
         _recognizer = new SpeechRecognizer(speechConfig, _audioConfig);
+
+        // TTS: separate config for synthesis — raw 8kHz 16-bit mono PCM (no WAV header)
+        // Matches the G.711 codec rate directly — no resampling needed
+        var synthConfig = SpeechConfig.FromSubscription(subscriptionKey, region);
+        synthConfig.SetSpeechSynthesisOutputFormat(SpeechSynthesisOutputFormat.Raw8Khz16BitMonoPcm);
+        synthConfig.SpeechSynthesisVoiceName = voiceName;
+        _synthesizer = new SpeechSynthesizer(synthConfig, null as AudioConfig);
 
         _recognizer.Recognized += (s, e) =>
         {
@@ -62,6 +70,22 @@ public sealed class AzureSpeechPipeline : IAsyncDisposable
         _audioStream.Write(pcmData, length);
     }
 
+    public async Task<byte[]?> SynthesizeSpeechAsync(string text)
+    {
+        var result = await _synthesizer.SpeakTextAsync(text);
+        if (result.Reason == ResultReason.SynthesizingAudioCompleted)
+        {
+            var durationSec = result.AudioData.Length / (8000.0 * 2);
+            _logger.LogInformation("TTS synthesized {Length} bytes ({Duration:F1}s) for call {CallId}", result.AudioData.Length, durationSec, _callId);
+            return result.AudioData;
+        }
+
+        var cancellation = SpeechSynthesisCancellationDetails.FromResult(result);
+        _logger.LogError("TTS failed for call {CallId}: {Reason} - {ErrorDetails}",
+            _callId, cancellation.Reason, cancellation.ErrorDetails);
+        return null;
+    }
+
     public async ValueTask DisposeAsync()
     {
         try
@@ -73,6 +97,7 @@ public sealed class AzureSpeechPipeline : IAsyncDisposable
             _logger.LogWarning(ex, "Error stopping STT recognizer for call {CallId}", _callId);
         }
 
+        _synthesizer.Dispose();
         _recognizer.Dispose();
         _audioConfig.Dispose();
         _audioStream.Dispose();

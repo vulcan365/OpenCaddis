@@ -28,6 +28,7 @@ public class SipConfigurationDto
     public string? EncryptedPassword { get; set; }
     public string? Extension { get; set; }
     public string? DisplayName { get; set; }
+    public string? AnswerGreeting { get; set; }
 }
 
 public class AzureSpeechConfigurationDto
@@ -35,6 +36,7 @@ public class AzureSpeechConfigurationDto
     public string Endpoint { get; set; } = string.Empty;
     public string Region { get; set; } = string.Empty;
     public string? EncryptedKey { get; set; }
+    public string VoiceName { get; set; } = "en-US-JennyNeural";
 }
 
 public class AgentConfigurationDto

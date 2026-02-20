@@ -178,6 +178,10 @@
                         <label class="form-label">Display Name <span class="text-body-secondary">(optional)</span></label>
                         <input @bind="_sipDisplayName" class="form-control" placeholder="Caller display name" />
                     </div>
+                    <div class="col-12">
+                        <label class="form-label">Answer Greeting <span class="text-body-secondary">(optional)</span></label>
+                        <input @bind="_sipAnswerGreeting" class="form-control" placeholder="Hello, how can I help you today?" />
+                    </div>
                 </div>
                 <div class="d-flex justify-content-end mt-3">
                     <button class="btn btn-primary btn-sm" @onclick="SaveSipSettings">
@@ -211,6 +215,10 @@
                     <div class="col-md-6">
                         <label class="form-label">API Key</label>
                         <input @bind="_azureSpeechKey" type="password" class="form-control" placeholder="@(_hasSavedAzureSpeechKey ? "(saved — leave blank to keep)" : "")" />
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Voice Name</label>
+                        <input @bind="_azureSpeechVoiceName" class="form-control" placeholder="en-US-JennyNeural" />
                     </div>
                 </div>
                 <div class="d-flex justify-content-end mt-3">
@@ -331,6 +339,7 @@
     private string _sipPassword = "";
     private string _sipExtension = "";
     private string _sipDisplayName = "";
+    private string _sipAnswerGreeting = "";
     private bool _sipSettingsSaved;
     private bool _hasSavedSipPassword;
 
@@ -338,6 +347,7 @@
     private string _azureSpeechEndpoint = "";
     private string _azureSpeechRegion = "";
     private string _azureSpeechKey = "";
+    private string _azureSpeechVoiceName = "en-US-JennyNeural";
     private bool _azureSpeechSettingsSaved;
     private bool _hasSavedAzureSpeechKey;
 
@@ -364,6 +374,7 @@
                 _sipUsername = config.SipPhone.Username;
                 _sipExtension = config.SipPhone.Extension ?? "";
                 _sipDisplayName = config.SipPhone.DisplayName ?? "";
+                _sipAnswerGreeting = config.SipPhone.AnswerGreeting ?? "";
                 _hasSavedSipPassword = !string.IsNullOrEmpty(config.SipPhone.EncryptedPassword);
             }
 
@@ -371,6 +382,7 @@
             {
                 _azureSpeechEndpoint = config.AzureSpeech.Endpoint;
                 _azureSpeechRegion = config.AzureSpeech.Region;
+                _azureSpeechVoiceName = config.AzureSpeech.VoiceName;
                 _hasSavedAzureSpeechKey = !string.IsNullOrEmpty(config.AzureSpeech.EncryptedKey);
             }
         }
@@ -440,6 +452,7 @@
         config.SipPhone.Username = _sipUsername;
         config.SipPhone.Extension = string.IsNullOrWhiteSpace(_sipExtension) ? null : _sipExtension;
         config.SipPhone.DisplayName = string.IsNullOrWhiteSpace(_sipDisplayName) ? null : _sipDisplayName;
+        config.SipPhone.AnswerGreeting = string.IsNullOrWhiteSpace(_sipAnswerGreeting) ? null : _sipAnswerGreeting;
 
         if (!string.IsNullOrEmpty(_sipPassword))
         {
@@ -463,6 +476,7 @@
         config.AzureSpeech ??= new AzureSpeechConfigurationDto();
         config.AzureSpeech.Endpoint = _azureSpeechEndpoint;
         config.AzureSpeech.Region = _azureSpeechRegion;
+        config.AzureSpeech.VoiceName = string.IsNullOrWhiteSpace(_azureSpeechVoiceName) ? "en-US-JennyNeural" : _azureSpeechVoiceName;
 
         if (!string.IsNullOrEmpty(_azureSpeechKey))
         {
