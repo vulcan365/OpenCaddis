@@ -2,19 +2,19 @@
   "ModelConfigurations": [
     {
       "Name": "default",
-      "Provider": "Azure",
-      "Uri": "https://YOUR_AZURE_ENDPOINT.cognitiveservices.azure.com/",
-      "Model": "gpt-5-nano",
+      "Provider": "OpenRouter",
+      "Uri": "https://openrouter.ai/api/v1",
+      "Model": "anthropic/claude-sonnet-4",
       "ApiKeyAlias": "default-key",
       "TimeoutSeconds": 60,
       "MaxOutputTokens": null
     },
     {
       "Name": "embeddings",
-      "Provider": "Azure",
-      "Uri": "https://YOUR_AZURE_ENDPOINT.cognitiveservices.azure.com/",
+      "Provider": "OpenAI",
+      "Uri": "",
       "Model": "text-embedding-ada-002",
-      "ApiKeyAlias": "default-key",
+      "ApiKeyAlias": "embeddings-key",
       "TimeoutSeconds": 60,
       "MaxOutputTokens": null
     }
@@ -22,7 +22,11 @@
   "ApiKeys": [
     {
       "Alias": "default-key",
-      "Value": "YOUR_API_KEY"
+      "Value": "YOUR_OPENROUTER_API_KEY"
+    },
+    {
+      "Alias": "embeddings-key",
+      "Value": "YOUR_OPENAI_API_KEY"
     }
   ]
 }

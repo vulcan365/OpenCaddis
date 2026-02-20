@@ -8,9 +8,9 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Fabr.Client" Version="1.2.59-beta" />
-    <PackageReference Include="Fabr.Host" Version="1.2.59-beta" />
-    <PackageReference Include="Fabr.Sdk" Version="1.2.59-beta" />
+    <PackageReference Include="Fabr.Client" Version="1.2.61-beta" />
+    <PackageReference Include="Fabr.Host" Version="1.2.61-beta" />
+    <PackageReference Include="Fabr.Sdk" Version="1.2.61-beta" />
 	  <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.3" />
 	  <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.3" />
     <PackageReference Include="Microsoft.Graph" Version="5.*" />
