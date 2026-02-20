@@ -116,7 +116,14 @@ public sealed class AgentEventLoggerProvider : ILoggerProvider
     {
         _isReady = false;
         _channel.Writer.TryComplete();
-        _cts.Cancel();
+        try
+        {
+            _cts.Cancel();
+        }
+        catch (ObjectDisposedException)
+        {
+            // Already disposed
+        }
         try
         {
             _processingTask.Wait(TimeSpan.FromSeconds(5));

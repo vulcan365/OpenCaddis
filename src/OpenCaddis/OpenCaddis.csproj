@@ -22,6 +22,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\OpenCaddis.Sdk\OpenCaddis.Sdk.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
     <Folder Include="Agentic\Plugins\" />
     <Folder Include="data\" />
   </ItemGroup>

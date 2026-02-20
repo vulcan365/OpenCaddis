@@ -1,4 +1,6 @@
 using System.ComponentModel.DataAnnotations;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace OpenCaddis.Services;
 
@@ -6,6 +8,9 @@ public class OpenCaddisConfigurationDto
 {
     public List<AgentConfigurationDto> Agents { get; set; } = [];
     public Microsoft365ConfigurationDto? Microsoft365 { get; set; }
+
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? ExtensionData { get; set; }
 }
 
 public class Microsoft365ConfigurationDto

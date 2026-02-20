@@ -130,8 +130,16 @@ public sealed class FileSystemPlugin : IFabrPlugin, IDisposable
         var files = Directory.GetFiles(fullPath);
         foreach (var file in files.OrderBy(f => f))
         {
-            var info = new FileInfo(file);
-            sb.AppendLine($"[FILE] {info.Name}  ({FormatSize(info.Length)})");
+            try
+            {
+                var info = new FileInfo(file);
+                sb.AppendLine($"[FILE] {info.Name}  ({FormatSize(info.Length)})");
+            }
+            catch (IOException)
+            {
+                // Skip device files (NUL, CON, etc.) that can't be stat'd
+                sb.AppendLine($"[FILE] {Path.GetFileName(file)}  (device)");
+            }
         }
 
         if (sb.Length == 0)

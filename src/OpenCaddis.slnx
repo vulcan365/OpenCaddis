@@ -1,3 +1,4 @@
 <Solution>
   <Project Path="OpenCaddis/OpenCaddis.csproj" Id="6e3b6cc6-a095-4c3e-acd0-5f00551a005a" />
+  <Project Path="OpenCaddis.Sdk/OpenCaddis.Sdk.csproj" />
 </Solution>

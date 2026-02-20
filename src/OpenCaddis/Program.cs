@@ -1,8 +1,10 @@
+using System.Reflection;
 using Fabr.Client;
 using Fabr.Host;
 using Fabr.Sdk;
 using Microsoft.AspNetCore.DataProtection;
 using OpenCaddis.Components;
+using OpenCaddis.Sdk;
 using OpenCaddis.Services;
 
 namespace OpenCaddis
@@ -37,6 +39,34 @@ namespace OpenCaddis
             builder.Services.AddSingleton<CompactionService>();
             builder.Services.AddHostedService<AgentBootstrapService>();
             builder.Services.AddHostedService<VectorStoreBootstrapService>();
+
+            builder.Services.AddSingleton<ICaddisConfigService>(sp =>
+                sp.GetRequiredService<OpenCaddisConfigService>());
+
+            // Discover and register Caddis addons
+            // Force-load assemblies from the output directory so addon types are discoverable
+            foreach (var dll in Directory.GetFiles(AppContext.BaseDirectory, "*.dll"))
+            {
+                try { Assembly.LoadFrom(dll); } catch { }
+            }
+
+            foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
+            {
+                Type[] types;
+                try { types = assembly.GetTypes(); }
+                catch (ReflectionTypeLoadException ex) { types = ex.Types.Where(t => t != null).ToArray()!; }
+                catch { continue; }
+
+                foreach (var type in types)
+                {
+                    if (type.GetCustomAttribute<CaddisAddonAttribute>() is not null
+                        && typeof(ICaddisAddon).IsAssignableFrom(type))
+                    {
+                        var addon = (ICaddisAddon)Activator.CreateInstance(type)!;
+                        addon.ConfigureServices(builder.Services);
+                    }
+                }
+            }
 
             builder.Services.AddOpenApi();
 

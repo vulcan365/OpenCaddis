@@ -1,3 +1,5 @@
+@using System.Reflection
+@using OpenCaddis.Sdk
 @inject Microsoft365AuthService AuthService
 @inject OpenCaddisConfigService ConfigService
 @inject IJSRuntime JS
@@ -133,6 +135,12 @@
             </div>
         </div>
     </section>
+
+    @* === Addon Settings (auto-discovered) === *@
+    @foreach (var component in _addonSettingsComponents)
+    {
+        <DynamicComponent Type="component" />
+    }
 </div>
 
 @code {
@@ -140,9 +148,21 @@
     private bool _settingsSaved;
     private string? _connectError;
 
+    private List<Type> _addonSettingsComponents = [];
+
     protected override async Task OnInitializedAsync()
     {
         AuthService.OnConnectionChanged += HandleConnectionChanged;
+
+        // Discover addon settings components
+        _addonSettingsComponents = AppDomain.CurrentDomain.GetAssemblies()
+            .SelectMany(a => { try { return a.GetTypes(); } catch { return []; } })
+            .Where(t => t.GetCustomAttribute<CaddisAddonAttribute>() is not null
+                         && typeof(ICaddisAddon).IsAssignableFrom(t))
+            .Select(t => ((ICaddisAddon)Activator.CreateInstance(t)!).SettingsComponentType)
+            .Where(t => t is not null)
+            .Cast<Type>()
+            .ToList();
 
         if (ConfigService.ConfigurationExists())
         {
