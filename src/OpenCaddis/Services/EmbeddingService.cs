@@ -1,36 +1,36 @@
-using System.Text.Json;
+using Azure.AI.OpenAI;
+using OpenAI;
+using System.ClientModel;
 
 namespace OpenCaddis.Services;
 
 public class EmbeddingService
 {
     private readonly FabrConfigService _configService;
-    private readonly IHttpClientFactory _httpClientFactory;
     private readonly ILogger<EmbeddingService> _logger;
     private readonly SemaphoreSlim _initLock = new(1, 1);
 
+    private string? _provider;
     private string? _endpoint;
     private string? _model;
     private string? _apiKey;
 
     public EmbeddingService(
         FabrConfigService configService,
-        IHttpClientFactory httpClientFactory,
         ILogger<EmbeddingService> logger)
     {
         _configService = configService;
-        _httpClientFactory = httpClientFactory;
         _logger = logger;
     }
 
     private async Task EnsureConfigLoadedAsync()
     {
-        if (_endpoint is not null) return;
+        if (_provider is not null) return;
 
         await _initLock.WaitAsync();
         try
         {
-            if (_endpoint is not null) return;
+            if (_provider is not null) return;
 
             var config = await _configService.LoadConfigurationAsync();
 
@@ -45,11 +45,13 @@ public class EmbeddingService
                 ?? throw new InvalidOperationException(
                     $"API key alias '{embeddingsModel.ApiKeyAlias}' not found in fabr.json.");
 
+            _provider = embeddingsModel.Provider;
             _endpoint = embeddingsModel.Uri.TrimEnd('/');
             _model = embeddingsModel.Model;
             _apiKey = apiKey.Value;
 
-            _logger.LogInformation("Embedding service configured: model={Model}, endpoint={Endpoint}", _model, _endpoint);
+            _logger.LogInformation("Embedding service configured: provider={Provider}, model={Model}, endpoint={Endpoint}",
+                _provider, _model, _endpoint);
         }
         finally
         {
@@ -61,31 +63,29 @@ public class EmbeddingService
     {
         await EnsureConfigLoadedAsync();
 
-        var url = $"{_endpoint}/openai/deployments/{_model}/embeddings?api-version=2024-06-01";
-
-        using var client = _httpClientFactory.CreateClient();
-        client.DefaultRequestHeaders.Add("api-key", _apiKey);
-
-        var requestBody = JsonSerializer.Serialize(new { input = text });
-        using var content = new StringContent(requestBody, System.Text.Encoding.UTF8, "application/json");
-
-        var response = await client.PostAsync(url, content);
-        response.EnsureSuccessStatusCode();
-
-        var json = await response.Content.ReadAsStringAsync();
-        using var doc = JsonDocument.Parse(json);
-
-        var embeddingArray = doc.RootElement
-            .GetProperty("data")[0]
-            .GetProperty("embedding");
-
-        var embedding = new float[embeddingArray.GetArrayLength()];
-        var i = 0;
-        foreach (var element in embeddingArray.EnumerateArray())
+#pragma warning disable OPENAI001 // OpenAIClientOptions.Endpoint is experimental
+        var embeddingClient = _provider!.ToLowerInvariant() switch
         {
-            embedding[i++] = element.GetSingle();
-        }
+            "azure" => new AzureOpenAIClient(new Uri(_endpoint!), new ApiKeyCredential(_apiKey!))
+                .GetEmbeddingClient(_model!),
 
-        return embedding;
+            "openai" => new OpenAIClient(new ApiKeyCredential(_apiKey!))
+                .GetEmbeddingClient(_model!),
+
+            "openrouter" or "gemini" => new OpenAIClient(
+                    new ApiKeyCredential(_apiKey!),
+                    new OpenAIClientOptions { Endpoint = new Uri(_endpoint!) })
+                .GetEmbeddingClient(_model!),
+
+            "grok" => throw new NotSupportedException(
+                "Grok (xAI) does not support embeddings. Use a different provider for your embeddings model."),
+
+            _ => throw new NotSupportedException(
+                $"Provider '{_provider}' is not supported for embeddings. Supported providers are: Azure, OpenAI, OpenRouter, Gemini.")
+        };
+#pragma warning restore OPENAI001
+
+        var result = await embeddingClient.GenerateEmbeddingAsync(text);
+        return result.Value.ToFloats().ToArray();
     }
 }
