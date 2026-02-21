@@ -1,6 +1,7 @@
 using System.ComponentModel.DataAnnotations;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using FabrCore.Core;
 
 namespace OpenCaddis.Services;
 
@@ -40,4 +41,6 @@ public class AgentConfigurationDto
     public List<string> Plugins { get; set; } = [];
 
     public List<string> Tools { get; set; } = [];
+
+    public List<McpServerConfig> McpServers { get; set; } = [];
 }

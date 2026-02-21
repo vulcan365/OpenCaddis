@@ -7,7 +7,8 @@ public class OpenCaddisConfigService : ICaddisConfigService
 {
     private static readonly JsonSerializerOptions SerializerOptions = new()
     {
-        WriteIndented = true
+        WriteIndented = true,
+        Converters = { new System.Text.Json.Serialization.JsonStringEnumConverter() }
     };
 
     private readonly string _configPath;
