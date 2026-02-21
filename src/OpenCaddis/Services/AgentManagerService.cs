@@ -1,5 +1,5 @@
-using Fabr.Client;
-using Fabr.Core;
+using FabrCore.Client;
+using FabrCore.Core;
 
 namespace OpenCaddis.Services;
 
@@ -96,7 +96,7 @@ public class AgentManagerService
                     if (!configuredHandles.Contains(tracked.Handle))
                     {
                         _logger.LogWarning(
-                            "Agent '{Handle}' is tracked by Fabr but no longer in opencaddis.json — it will idle-deactivate",
+                            "Agent '{Handle}' is tracked by FabrCore but no longer in opencaddis.json — it will idle-deactivate",
                             tracked.Handle);
                     }
                 }

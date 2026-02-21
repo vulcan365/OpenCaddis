@@ -370,7 +370,7 @@ FodyWeavers.xsd
 *.db-wal
 
 # User configuration (contains secrets)
-src/OpenCaddis/fabr.json
+src/OpenCaddis/fabrcore.json
 src/OpenCaddis/opencaddis.json
 
 # Claude Code local settings
@@ -379,7 +379,9 @@ src/OpenCaddis/opencaddis.json
 # SQLite user data
 src/OpenCaddis/data/
 
-# Fabr runtime temp files
-c:\temp\fabrfiles/
+# FabrCore runtime temp files
+c:\temp\fabrcorefiles/
 /src/OpenCaddis/opencaddis.json
-/src/OpenCaddis/fabr.json
+/src/OpenCaddis/fabrcore.json
+
+.claude/

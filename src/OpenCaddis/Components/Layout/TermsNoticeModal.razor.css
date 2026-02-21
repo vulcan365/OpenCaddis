@@ -1,0 +1,49 @@
+.terms-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 1050;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: var(--oc-bg-overlay);
+    backdrop-filter: blur(4px);
+}
+
+.terms-modal {
+    background-color: var(--oc-bg-surface);
+    border: 1px solid var(--oc-border);
+    border-radius: var(--oc-radius-lg);
+    box-shadow: var(--oc-shadow-lg);
+    padding: 2rem 2.25rem;
+    max-width: 480px;
+    width: 90%;
+    text-align: center;
+}
+
+.terms-title {
+    color: var(--oc-text-primary);
+    margin-bottom: 1.25rem;
+    font-weight: 600;
+}
+
+.terms-body {
+    color: var(--oc-text-secondary);
+    font-size: 0.9rem;
+    line-height: 1.6;
+    text-align: left;
+    margin-bottom: 1.5rem;
+}
+
+.terms-body p {
+    margin-bottom: 0.75rem;
+}
+
+.terms-body p:last-child {
+    margin-bottom: 0;
+}
+
+.terms-accept-btn {
+    width: 100%;
+    padding: 0.6rem 1.5rem;
+    font-weight: 600;
+}

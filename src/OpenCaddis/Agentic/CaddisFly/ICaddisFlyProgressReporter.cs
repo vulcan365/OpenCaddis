@@ -1,4 +1,4 @@
-using Fabr.Sdk;
+using FabrCore.Sdk;
 using OpenCaddis.Agentic;
 
 namespace OpenCaddis.Agentic.CaddisFly;
@@ -18,9 +18,9 @@ public interface ICaddisFlyProgressReporter
 /// </summary>
 public sealed class ThinkingProgressReporter : ICaddisFlyProgressReporter
 {
-    private readonly IFabrAgentHost? _host;
+    private readonly IFabrCoreAgentHost? _host;
 
-    public ThinkingProgressReporter(IFabrAgentHost? host) => _host = host;
+    public ThinkingProgressReporter(IFabrCoreAgentHost? host) => _host = host;
 
     public async Task ReportStepStartingAsync(int stepIndex, int totalSteps, string stepName)
     {

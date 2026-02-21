@@ -1,7 +1,7 @@
 using System.ComponentModel;
 using System.Text;
-using Fabr.Core;
-using Fabr.Sdk;
+using FabrCore.Core;
+using FabrCore.Sdk;
 using Microsoft.Extensions.Logging;
 using Microsoft.Graph;
 using Microsoft.Graph.Models;
@@ -13,9 +13,9 @@ using OpenCaddis.Services;
 namespace OpenCaddis.Agentic.Plugins;
 
 [PluginAlias("Microsoft365Email")]
-public sealed class Microsoft365EmailPlugin : IFabrPlugin
+public sealed class Microsoft365EmailPlugin : IFabrCorePlugin
 {
-    private IFabrAgentHost? _host;
+    private IFabrCoreAgentHost? _host;
     private ILogger<Microsoft365EmailPlugin> _logger = null!;
     private Microsoft365AuthService _authService = null!;
     private int _maxResults = 25;
@@ -23,7 +23,7 @@ public sealed class Microsoft365EmailPlugin : IFabrPlugin
 
     public Task InitializeAsync(AgentConfiguration config, IServiceProvider serviceProvider)
     {
-        _host = serviceProvider.GetService<IFabrAgentHost>();
+        _host = serviceProvider.GetService<IFabrCoreAgentHost>();
         _logger = serviceProvider.GetRequiredService<ILogger<Microsoft365EmailPlugin>>();
         _authService = serviceProvider.GetRequiredService<Microsoft365AuthService>();
 

@@ -1,16 +1,16 @@
 using System.ComponentModel;
-using Fabr.Core;
-using Fabr.Sdk;
+using FabrCore.Core;
+using FabrCore.Sdk;
 using Microsoft.Extensions.Logging;
 
 namespace OpenCaddis.Agentic.Tools;
 
 public class AgentMessageTool
 {
-    private readonly IFabrAgentHost _agentHost;
+    private readonly IFabrCoreAgentHost _agentHost;
     private readonly ILogger<AgentMessageTool> _logger;
 
-    public AgentMessageTool(IFabrAgentHost agentHost, ILogger<AgentMessageTool> logger)
+    public AgentMessageTool(IFabrCoreAgentHost agentHost, ILogger<AgentMessageTool> logger)
     {
         _agentHost = agentHost;
         _logger = logger;

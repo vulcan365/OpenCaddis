@@ -1,5 +1,5 @@
 using System.ComponentModel;
-using Fabr.Sdk;
+using FabrCore.Sdk;
 
 namespace OpenCaddis.Agentic.Tools;
 

@@ -1,12 +1,12 @@
-using Fabr.Core;
-using Fabr.Sdk;
+using FabrCore.Core;
+using FabrCore.Sdk;
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
 
 namespace OpenCaddis.Agentic.Agents;
 
 [AgentAlias("assistant")]
-public class AssistantAgent : FabrAgentProxy
+public class AssistantAgent : FabrCoreAgentProxy
 {
     private AIAgent? agent;
     private AgentSession? session;
@@ -14,8 +14,8 @@ public class AssistantAgent : FabrAgentProxy
     public AssistantAgent(
         AgentConfiguration config,
         IServiceProvider serviceProvider,
-        IFabrAgentHost fabrAgentHost)
-        : base(config, serviceProvider, fabrAgentHost)
+        IFabrCoreAgentHost fabrcoreAgentHost)
+        : base(config, serviceProvider, fabrcoreAgentHost)
     {
     }
 
@@ -26,7 +26,7 @@ public class AssistantAgent : FabrAgentProxy
 
         var result = await CreateChatClientAgent(
             modelConfigName,
-            threadId: config.Handle ?? fabrAgentHost.GetHandle(),
+            threadId: config.Handle ?? fabrcoreAgentHost.GetHandle(),
             tools: tools
         );
 
@@ -40,7 +40,7 @@ public class AssistantAgent : FabrAgentProxy
 
     public override async Task<AgentMessage> OnMessage(AgentMessage message)
     {
-        var myHandle = fabrAgentHost.GetHandle();
+        var myHandle = fabrcoreAgentHost.GetHandle();
         if (message.FromHandle is not null && message.FromHandle != myHandle)
         {
             ThinkingNotifier.SetClientHandle(myHandle, message.FromHandle);
@@ -56,14 +56,14 @@ public class AssistantAgent : FabrAgentProxy
             config.Handle, Truncate(message.Message ?? "", 200));
 
         // Send a thinking indicator to the client
-        await ThinkingNotifier.SendThinkingAsync(fabrAgentHost, "Thinking...");
+        await ThinkingNotifier.SendThinkingAsync(fabrcoreAgentHost, "Thinking...");
 
         // Run compaction if needed before invoking the model
         var compaction = await TryCompactAsync(
-            onCompacting: () => ThinkingNotifier.SendThinkingAsync(fabrAgentHost, "Compacting history..."));
+            onCompacting: () => ThinkingNotifier.SendThinkingAsync(fabrcoreAgentHost, "Compacting history..."));
         if (compaction?.WasCompacted == true)
         {
-            await ThinkingNotifier.SendThinkingAsync(fabrAgentHost,
+            await ThinkingNotifier.SendThinkingAsync(fabrcoreAgentHost,
                 $"Compacted history: {compaction.OriginalMessageCount} → {compaction.CompactedMessageCount} messages");
         }
 
@@ -92,7 +92,7 @@ public class AssistantAgent : FabrAgentProxy
             // client explicitly so it appears in the UI.
             if (ThinkingNotifier.TryGetClientHandle(myHandle, out var clientHandle))
             {
-                await fabrAgentHost.SendMessage(new AgentMessage
+                await fabrcoreAgentHost.SendMessage(new AgentMessage
                 {
                     ToHandle = clientHandle,
                     FromHandle = myHandle,
@@ -109,7 +109,7 @@ public class AssistantAgent : FabrAgentProxy
                 {
                     try
                     {
-                        await fabrAgentHost.UnregisterReminder(reminderName);
+                        await fabrcoreAgentHost.UnregisterReminder(reminderName);
                         logger.LogInformation("Auto-unregistered one-shot reminder '{ReminderName}'", reminderName);
                     }
                     catch (Exception ex)

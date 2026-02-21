@@ -2,17 +2,17 @@ using System.ComponentModel;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using Fabr.Core;
-using Fabr.Sdk;
+using FabrCore.Core;
+using FabrCore.Sdk;
 using Microsoft.Extensions.Logging;
 using OpenCaddis.Agentic;
 
 namespace OpenCaddis.Agentic.Plugins;
 
 [PluginAlias("TaskManager")]
-public sealed class TaskManagerPlugin : IFabrPlugin
+public sealed class TaskManagerPlugin : IFabrCorePlugin
 {
-    private IFabrAgentHost? _host;
+    private IFabrCoreAgentHost? _host;
     private ILogger<TaskManagerPlugin> _logger = null!;
     private string _filePath = Path.Combine(Directory.GetCurrentDirectory(), "tasks.json");
     private TaskList _taskList = new();
@@ -27,7 +27,7 @@ public sealed class TaskManagerPlugin : IFabrPlugin
 
     public Task InitializeAsync(AgentConfiguration config, IServiceProvider serviceProvider)
     {
-        _host = serviceProvider.GetService<IFabrAgentHost>();
+        _host = serviceProvider.GetService<IFabrCoreAgentHost>();
         _logger = serviceProvider.GetRequiredService<ILogger<TaskManagerPlugin>>();
 
         var rootPath = config.GetPluginSetting("TaskManager", "RootPath");

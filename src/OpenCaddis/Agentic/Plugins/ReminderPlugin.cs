@@ -1,20 +1,20 @@
 using System.ComponentModel;
-using Fabr.Core;
-using Fabr.Sdk;
+using FabrCore.Core;
+using FabrCore.Sdk;
 using Microsoft.Extensions.Logging;
 using OpenCaddis.Agentic;
 
 namespace OpenCaddis.Agentic.Plugins;
 
 [PluginAlias("Reminders")]
-public sealed class ReminderPlugin : IFabrPlugin
+public sealed class ReminderPlugin : IFabrCorePlugin
 {
-    private IFabrAgentHost? _host;
+    private IFabrCoreAgentHost? _host;
     private ILogger<ReminderPlugin> _logger = null!;
 
     public Task InitializeAsync(AgentConfiguration config, IServiceProvider serviceProvider)
     {
-        _host = serviceProvider.GetService<IFabrAgentHost>();
+        _host = serviceProvider.GetService<IFabrCoreAgentHost>();
         _logger = serviceProvider.GetRequiredService<ILogger<ReminderPlugin>>();
 
         _logger.LogInformation("ReminderPlugin initialized");

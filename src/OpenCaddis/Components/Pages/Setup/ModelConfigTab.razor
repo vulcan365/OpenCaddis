@@ -1,5 +1,5 @@
 @using System.ComponentModel.DataAnnotations
-@inject FabrConfigService ConfigService
+@inject FabrCoreConfigService ConfigService
 @inject IJSRuntime JS
 
 <EditForm Model="_form" OnValidSubmit="SaveConfiguration">
@@ -17,48 +17,6 @@
             </label>
         </div>
 
-        @* === Connection Settings (shared) === *@
-        <section>
-            <h5 class="fw-semibold mb-1">Connection</h5>
-            <p class="text-body-secondary small mb-3">Provider connection shared by both models.</p>
-
-            <div class="card">
-                <div class="card-body">
-                    <div class="row g-3">
-                        <div class="col-md-6">
-                            <label class="form-label">Provider</label>
-                            <InputSelect @bind-Value="_form.Provider" class="form-select">
-                                @foreach (var provider in Providers)
-                                {
-                                    <option value="@provider">@provider</option>
-                                }
-                            </InputSelect>
-                            <ValidationMessage For="() => _form.Provider" />
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label">Endpoint URI <span class="text-body-secondary fw-normal">(opt)</span></label>
-                            <InputText @bind-Value="_form.EndpointUri" class="form-control" placeholder="https://your-resource.cognitiveservices.azure.com/" />
-                            <div class="form-text">Required for Azure AI Foundry. Optional for OpenAI.</div>
-                        </div>
-                    </div>
-                    <div class="row g-3 mt-1">
-                        <div class="col-12">
-                            <label class="form-label">API Key</label>
-                            <div class="input-group">
-                                <input type="@(_showApiKey ? "text" : "password")" class="form-control" placeholder="Enter your API key"
-                                       value="@_form.ApiKey"
-                                       @onchange="e => _form.ApiKey = e.Value?.ToString() ?? string.Empty" />
-                                <button type="button" class="btn btn-outline-secondary" @onclick="() => _showApiKey = !_showApiKey" tabindex="-1">
-                                    <i class="bi @(_showApiKey ? "bi-eye-slash" : "bi-eye")"></i>
-                                </button>
-                            </div>
-                            <ValidationMessage For="() => _form.ApiKey" />
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </section>
-
         @* === Default Model === *@
         <section>
             <div class="d-flex align-items-center gap-2 mb-1">
@@ -71,8 +29,41 @@
                 <div class="card-body">
                     <div class="row g-3">
                         <div class="col-md-6">
+                            <label class="form-label">Provider</label>
+                            <InputSelect @bind-Value="_form.DefaultProvider" class="form-select"
+                                         @bind-Value:after="OnDefaultProviderChanged">
+                                @foreach (var provider in Providers)
+                                {
+                                    <option value="@provider">@provider</option>
+                                }
+                            </InputSelect>
+                            <ValidationMessage For="() => _form.DefaultProvider" />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Endpoint URI @EndpointHint(_form.DefaultProvider)</label>
+                            <InputText @bind-Value="_form.DefaultEndpointUri" class="form-control"
+                                       placeholder="@EndpointPlaceholder(_form.DefaultProvider)" />
+                            <div class="form-text">@EndpointHelp(_form.DefaultProvider)</div>
+                        </div>
+                    </div>
+                    <div class="row g-3 mt-1">
+                        <div class="col-12">
+                            <label class="form-label">API Key</label>
+                            <div class="input-group">
+                                <input type="@(_showDefaultApiKey ? "text" : "password")" class="form-control" placeholder="Enter your API key"
+                                       value="@_form.DefaultApiKey"
+                                       @onchange="e => _form.DefaultApiKey = e.Value?.ToString() ?? string.Empty" />
+                                <button type="button" class="btn btn-outline-secondary" @onclick="() => _showDefaultApiKey = !_showDefaultApiKey" tabindex="-1">
+                                    <i class="bi @(_showDefaultApiKey ? "bi-eye-slash" : "bi-eye")"></i>
+                                </button>
+                            </div>
+                            <ValidationMessage For="() => _form.DefaultApiKey" />
+                        </div>
+                    </div>
+                    <div class="row g-3 mt-1">
+                        <div class="col-md-6">
                             <label class="form-label">Model</label>
-                            <InputText @bind-Value="_form.DefaultModel" class="form-control" placeholder="e.g. gpt-4o, gpt-5-nano" />
+                            <InputText @bind-Value="_form.DefaultModel" class="form-control" placeholder="@ModelPlaceholder(_form.DefaultProvider)" />
                             <ValidationMessage For="() => _form.DefaultModel" />
                         </div>
                         <div class="col-md-3">
@@ -103,28 +94,194 @@
             </div>
             <p class="text-body-secondary small mb-3">Text embedding model for vector operations.</p>
 
+            <div class="form-check mb-3">
+                <input type="checkbox" class="form-check-input" id="useSharedConnection"
+                       checked="@_form.UseSharedConnection"
+                       @onchange="e => _form.UseSharedConnection = (bool)(e.Value ?? false)" />
+                <label class="form-check-label" for="useSharedConnection">
+                    Use same connection as default model
+                </label>
+            </div>
+
             <div class="card">
                 <div class="card-body">
-                    <div class="row g-3">
-                        <div class="col-md-6">
-                            <label class="form-label">Model</label>
-                            <InputText @bind-Value="_form.EmbeddingsModel" class="form-control" placeholder="e.g. text-embedding-ada-002" />
-                            <ValidationMessage For="() => _form.EmbeddingsModel" />
+                    @if (!_form.UseSharedConnection)
+                    {
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Provider</label>
+                                <InputSelect @bind-Value="_form.EmbeddingsProvider" class="form-select"
+                                             @bind-Value:after="OnEmbeddingsProviderChanged">
+                                    @foreach (var provider in EmbeddingProviders)
+                                    {
+                                        <option value="@provider">@provider</option>
+                                    }
+                                </InputSelect>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Endpoint URI @EndpointHint(_form.EmbeddingsProvider)</label>
+                                <InputText @bind-Value="_form.EmbeddingsEndpointUri" class="form-control"
+                                           placeholder="@EndpointPlaceholder(_form.EmbeddingsProvider)" />
+                                <div class="form-text">@EndpointHelp(_form.EmbeddingsProvider)</div>
+                            </div>
                         </div>
-                        <div class="col-md-3">
-                            <label class="form-label">Timeout (s)</label>
-                            <InputNumber @bind-Value="_form.EmbeddingsTimeoutSeconds" class="form-control" />
+                        <div class="row g-3 mt-1">
+                            <div class="col-12">
+                                <label class="form-label">API Key</label>
+                                <div class="input-group">
+                                    <input type="@(_showEmbeddingsApiKey ? "text" : "password")" class="form-control" placeholder="Enter your API key"
+                                           value="@_form.EmbeddingsApiKey"
+                                           @onchange="e => _form.EmbeddingsApiKey = e.Value?.ToString() ?? string.Empty" />
+                                    <button type="button" class="btn btn-outline-secondary" @onclick="() => _showEmbeddingsApiKey = !_showEmbeddingsApiKey" tabindex="-1">
+                                        <i class="bi @(_showEmbeddingsApiKey ? "bi-eye-slash" : "bi-eye")"></i>
+                                    </button>
+                                </div>
+                            </div>
                         </div>
-                        <div class="col-md-3">
-                            <label class="form-label">Max Tokens <span class="text-body-secondary fw-normal">(opt)</span></label>
-                            <InputNumber @bind-Value="_form.EmbeddingsMaxOutputTokens" class="form-control" />
+                        <div class="row g-3 mt-1">
+                            <div class="col-md-6">
+                                <label class="form-label">Model</label>
+                                <InputText @bind-Value="_form.EmbeddingsModel" class="form-control" placeholder="e.g. text-embedding-ada-002" />
+                                <ValidationMessage For="() => _form.EmbeddingsModel" />
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">Timeout (s)</label>
+                                <InputNumber @bind-Value="_form.EmbeddingsTimeoutSeconds" class="form-control" />
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">Max Tokens <span class="text-body-secondary fw-normal">(opt)</span></label>
+                                <InputNumber @bind-Value="_form.EmbeddingsMaxOutputTokens" class="form-control" />
+                            </div>
                         </div>
-                    </div>
+                    }
+                    else
+                    {
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Model</label>
+                                <InputText @bind-Value="_form.EmbeddingsModel" class="form-control" placeholder="e.g. text-embedding-ada-002" />
+                                <ValidationMessage For="() => _form.EmbeddingsModel" />
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">Timeout (s)</label>
+                                <InputNumber @bind-Value="_form.EmbeddingsTimeoutSeconds" class="form-control" />
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">Max Tokens <span class="text-body-secondary fw-normal">(opt)</span></label>
+                                <InputNumber @bind-Value="_form.EmbeddingsMaxOutputTokens" class="form-control" />
+                            </div>
+                        </div>
+                    }
                 </div>
             </div>
         </section>
 
+        @* === Additional Models === *@
+        <section>
+            <div class="d-flex align-items-center gap-2 mb-1">
+                <h5 class="fw-semibold mb-0">Additional Models</h5>
+                <span class="badge bg-secondary">optional</span>
+            </div>
+            <p class="text-body-secondary small mb-3">Custom named model configurations that agents can reference (e.g. "grok", "gemini").</p>
+
+            @if (_additionalModels.Count == 0)
+            {
+                <p class="text-body-secondary fst-italic small">No additional models configured.</p>
+            }
+
+            @for (var i = 0; i < _additionalModels.Count; i++)
+            {
+                var index = i;
+                var model = _additionalModels[index];
+                var nameError = ValidateAdditionalModelName(model, index);
+
+                <div class="card mb-3">
+                    <div class="card-header d-flex justify-content-between align-items-center py-2">
+                        <div class="d-flex align-items-center gap-2 flex-grow-1">
+                            <span class="badge bg-info">@(string.IsNullOrWhiteSpace(model.Name) ? "unnamed" : model.Name)</span>
+                            <input type="text" class="form-control form-control-sm" style="max-width: 200px;"
+                                   placeholder="Config name (e.g. grok)"
+                                   value="@model.Name"
+                                   @onchange="e => model.Name = (e.Value?.ToString() ?? string.Empty).Trim().ToLowerInvariant()" />
+                            @if (nameError is not null)
+                            {
+                                <span class="text-danger small">@nameError</span>
+                            }
+                        </div>
+                        <button type="button" class="btn btn-outline-danger btn-sm" @onclick="() => RemoveAdditionalModel(index)">
+                            <i class="bi bi-trash"></i>
+                        </button>
+                    </div>
+                    <div class="card-body">
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Provider</label>
+                                <select class="form-select"
+                                        value="@model.Provider"
+                                        @onchange="@(e => OnAdditionalProviderChanged(model, e.Value?.ToString() ?? "Azure"))">
+                                    @foreach (var provider in Providers)
+                                    {
+                                        <option value="@provider">@provider</option>
+                                    }
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Endpoint URI @EndpointHint(model.Provider)</label>
+                                <input type="text" class="form-control"
+                                       placeholder="@EndpointPlaceholder(model.Provider)"
+                                       value="@model.EndpointUri"
+                                       @onchange="e => model.EndpointUri = e.Value?.ToString() ?? string.Empty" />
+                                <div class="form-text">@EndpointHelp(model.Provider)</div>
+                            </div>
+                        </div>
+                        <div class="row g-3 mt-1">
+                            <div class="col-12">
+                                <label class="form-label">API Key</label>
+                                <div class="input-group">
+                                    <input type="@(model.ShowApiKey ? "text" : "password")" class="form-control" placeholder="Enter your API key"
+                                           value="@model.ApiKey"
+                                           @onchange="e => model.ApiKey = e.Value?.ToString() ?? string.Empty" />
+                                    <button type="button" class="btn btn-outline-secondary" @onclick="() => model.ShowApiKey = !model.ShowApiKey" tabindex="-1">
+                                        <i class="bi @(model.ShowApiKey ? "bi-eye-slash" : "bi-eye")"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row g-3 mt-1">
+                            <div class="col-md-6">
+                                <label class="form-label">Model</label>
+                                <input type="text" class="form-control"
+                                       placeholder="@ModelPlaceholder(model.Provider)"
+                                       value="@model.Model"
+                                       @onchange="e => model.Model = e.Value?.ToString() ?? string.Empty" />
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">Timeout (s)</label>
+                                <input type="number" class="form-control"
+                                       value="@model.TimeoutSeconds"
+                                       @onchange="e => { if (int.TryParse(e.Value?.ToString(), out var v)) model.TimeoutSeconds = v; }" />
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">Max Tokens <span class="text-body-secondary fw-normal">(opt)</span></label>
+                                <input type="number" class="form-control"
+                                       value="@model.MaxOutputTokens"
+                                       @onchange="e => model.MaxOutputTokens = int.TryParse(e.Value?.ToString(), out var v) ? v : null" />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            }
+
+            <button type="button" class="btn btn-outline-primary btn-sm" @onclick="AddAdditionalModel">
+                <i class="bi bi-plus-lg me-1"></i> Add Model
+            </button>
+        </section>
+
         @* === Save === *@
+        @if (_saveError is not null)
+        {
+            <div class="alert alert-danger py-2 small">@_saveError</div>
+        }
         <div class="d-flex justify-content-end pt-3 border-top">
             <button type="submit" class="btn btn-primary">
                 <i class="bi bi-save me-1"></i> Save Configuration
@@ -139,9 +296,21 @@
 
     private SetupFormModel _form = new();
     private bool _hasExistingConfig;
-    private bool _showApiKey;
+    private bool _showDefaultApiKey;
+    private bool _showEmbeddingsApiKey;
+    private List<AdditionalModelFormModel> _additionalModels = [];
+    private string? _saveError;
 
-    private static readonly string[] Providers = ["Azure", "OpenAI"];
+    private static readonly string[] Providers = ["Azure", "OpenAI", "OpenRouter", "Grok", "Gemini"];
+    // Grok doesn't support embeddings — exclude from embeddings provider list
+    private static readonly string[] EmbeddingProviders = ["Azure", "OpenAI", "OpenRouter", "Gemini"];
+
+    private static readonly Dictionary<string, string> DefaultEndpoints = new()
+    {
+        ["OpenRouter"] = "https://openrouter.ai/api/v1",
+        ["Grok"] = "https://api.x.ai/v1",
+        ["Gemini"] = "https://generativelanguage.googleapis.com/v1beta/openai/"
+    };
 
     protected override async Task OnInitializedAsync()
     {
@@ -154,18 +323,20 @@
         }
     }
 
-    private void LoadFromConfig(FabrConfigurationDto config)
+    private void LoadFromConfig(FabrCoreConfigurationDto config)
     {
-        var apiKey = config.ApiKeys.FirstOrDefault();
         var defaultModel = config.ModelConfigurations.FirstOrDefault(m => m.Name == "default");
         var embeddingsModel = config.ModelConfigurations.FirstOrDefault(m => m.Name == "embeddings");
 
-        // Connection (from first API key + first model's provider/URI)
-        _form.ApiKey = apiKey?.Value ?? string.Empty;
-        _form.Provider = defaultModel?.Provider ?? embeddingsModel?.Provider ?? "Azure";
-        _form.EndpointUri = defaultModel?.Uri ?? embeddingsModel?.Uri ?? string.Empty;
+        // Default model connection
+        var defaultApiKey = config.ApiKeys.FirstOrDefault(k =>
+            k.Alias.Equals(defaultModel?.ApiKeyAlias ?? "default-key", StringComparison.OrdinalIgnoreCase));
 
-        // Default model
+        _form.DefaultProvider = defaultModel?.Provider ?? "Azure";
+        _form.DefaultEndpointUri = defaultModel?.Uri ?? string.Empty;
+        _form.DefaultApiKey = defaultApiKey?.Value ?? string.Empty;
+
+        // Default model settings
         if (defaultModel is not null)
         {
             _form.DefaultModel = defaultModel.Model;
@@ -174,52 +345,277 @@
             _form.DefaultContextWindowTokens = defaultModel.ContextWindowTokens;
         }
 
-        // Embeddings model
+        // Embeddings model settings
         if (embeddingsModel is not null)
         {
             _form.EmbeddingsModel = embeddingsModel.Model;
             _form.EmbeddingsTimeoutSeconds = embeddingsModel.TimeoutSeconds;
             _form.EmbeddingsMaxOutputTokens = embeddingsModel.MaxOutputTokens;
+
+            // Detect whether embeddings uses a separate connection
+            var embeddingsApiKey = config.ApiKeys.FirstOrDefault(k =>
+                k.Alias.Equals(embeddingsModel.ApiKeyAlias, StringComparison.OrdinalIgnoreCase));
+
+            var sameProvider = string.Equals(defaultModel?.Provider, embeddingsModel.Provider, StringComparison.OrdinalIgnoreCase);
+            var sameUri = string.Equals(defaultModel?.Uri, embeddingsModel.Uri, StringComparison.OrdinalIgnoreCase);
+            var sameKeyAlias = string.Equals(defaultModel?.ApiKeyAlias, embeddingsModel.ApiKeyAlias, StringComparison.OrdinalIgnoreCase);
+
+            _form.UseSharedConnection = sameProvider && sameUri && sameKeyAlias;
+
+            if (!_form.UseSharedConnection)
+            {
+                _form.EmbeddingsProvider = embeddingsModel.Provider;
+                _form.EmbeddingsEndpointUri = embeddingsModel.Uri;
+                _form.EmbeddingsApiKey = embeddingsApiKey?.Value ?? string.Empty;
+            }
         }
+
+        // Additional named models
+        _additionalModels = config.ModelConfigurations
+            .Where(m => m.Name is not "default" and not "embeddings")
+            .Select(m =>
+            {
+                var key = config.ApiKeys.FirstOrDefault(k =>
+                    k.Alias.Equals(m.ApiKeyAlias, StringComparison.OrdinalIgnoreCase));
+                return new AdditionalModelFormModel
+                {
+                    Name = m.Name,
+                    Provider = m.Provider,
+                    EndpointUri = m.Uri,
+                    ApiKey = key?.Value ?? string.Empty,
+                    Model = m.Model,
+                    TimeoutSeconds = m.TimeoutSeconds,
+                    MaxOutputTokens = m.MaxOutputTokens
+                };
+            })
+            .ToList();
     }
 
-    private FabrConfigurationDto BuildConfig() => new()
+    private FabrCoreConfigurationDto BuildConfig()
     {
-        ApiKeys =
-        [
-            new ApiKeyConfigurationDto { Alias = "default-key", Value = _form.ApiKey }
-        ],
-        ModelConfigurations =
-        [
-            new ModelConfigurationDto
+        var apiKeys = new List<ApiKeyConfigurationDto>
+        {
+            new() { Alias = "default-key", Value = _form.DefaultApiKey }
+        };
+
+        // Track key values to aliases for deduplication
+        var keyValueToAlias = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            [_form.DefaultApiKey] = "default-key"
+        };
+
+        string embeddingsProvider;
+        string embeddingsUri;
+        string embeddingsKeyAlias;
+
+        if (_form.UseSharedConnection)
+        {
+            embeddingsProvider = _form.DefaultProvider;
+            embeddingsUri = _form.DefaultEndpointUri;
+            embeddingsKeyAlias = "default-key";
+        }
+        else
+        {
+            embeddingsProvider = _form.EmbeddingsProvider;
+            embeddingsUri = _form.EmbeddingsEndpointUri;
+            embeddingsKeyAlias = ResolveOrAddKey(apiKeys, keyValueToAlias, _form.EmbeddingsApiKey, "embeddings-key");
+        }
+
+        var modelConfigs = new List<ModelConfigurationDto>
+        {
+            new()
             {
                 Name = "default",
-                Provider = _form.Provider,
-                Uri = _form.EndpointUri,
+                Provider = _form.DefaultProvider,
+                Uri = _form.DefaultEndpointUri,
                 Model = _form.DefaultModel,
                 ApiKeyAlias = "default-key",
                 TimeoutSeconds = _form.DefaultTimeoutSeconds,
                 MaxOutputTokens = _form.DefaultMaxOutputTokens,
                 ContextWindowTokens = _form.DefaultContextWindowTokens
             },
-            new ModelConfigurationDto
+            new()
             {
                 Name = "embeddings",
-                Provider = _form.Provider,
-                Uri = _form.EndpointUri,
+                Provider = embeddingsProvider,
+                Uri = embeddingsUri,
                 Model = _form.EmbeddingsModel,
-                ApiKeyAlias = "default-key",
+                ApiKeyAlias = embeddingsKeyAlias,
                 TimeoutSeconds = _form.EmbeddingsTimeoutSeconds,
                 MaxOutputTokens = _form.EmbeddingsMaxOutputTokens
             }
-        ]
-    };
+        };
+
+        foreach (var additional in _additionalModels)
+        {
+            var alias = ResolveOrAddKey(apiKeys, keyValueToAlias, additional.ApiKey, $"{additional.Name}-key");
+            modelConfigs.Add(new ModelConfigurationDto
+            {
+                Name = additional.Name,
+                Provider = additional.Provider,
+                Uri = additional.EndpointUri,
+                Model = additional.Model,
+                ApiKeyAlias = alias,
+                TimeoutSeconds = additional.TimeoutSeconds,
+                MaxOutputTokens = additional.MaxOutputTokens
+            });
+        }
+
+        return new FabrCoreConfigurationDto
+        {
+            ApiKeys = apiKeys,
+            ModelConfigurations = modelConfigs
+        };
+    }
+
+    /// <summary>
+    /// If the key value already exists, return its alias. Otherwise add a new entry and return the preferred alias.
+    /// </summary>
+    private static string ResolveOrAddKey(
+        List<ApiKeyConfigurationDto> apiKeys,
+        Dictionary<string, string> keyValueToAlias,
+        string keyValue,
+        string preferredAlias)
+    {
+        if (string.IsNullOrEmpty(keyValue))
+            return preferredAlias;
+
+        if (keyValueToAlias.TryGetValue(keyValue, out var existingAlias))
+            return existingAlias;
+
+        apiKeys.Add(new ApiKeyConfigurationDto { Alias = preferredAlias, Value = keyValue });
+        keyValueToAlias[keyValue] = preferredAlias;
+        return preferredAlias;
+    }
 
     private async Task SaveConfiguration()
     {
+        _saveError = null;
+
+        // Validate additional models before saving
+        for (var i = 0; i < _additionalModels.Count; i++)
+        {
+            var m = _additionalModels[i];
+            var nameErr = ValidateAdditionalModelName(m, i);
+            if (nameErr is not null)
+            {
+                _saveError = $"Additional model #{i + 1}: {nameErr}";
+                return;
+            }
+            if (string.IsNullOrWhiteSpace(m.Model))
+            {
+                _saveError = $"Additional model \"{m.Name}\": Model is required.";
+                return;
+            }
+            if (string.IsNullOrWhiteSpace(m.ApiKey))
+            {
+                _saveError = $"Additional model \"{m.Name}\": API Key is required.";
+                return;
+            }
+        }
+
         await ConfigService.SaveConfigurationAsync(BuildConfig());
         await OnConfigurationSaved.InvokeAsync();
     }
+
+    // === Additional model helpers ===
+
+    private void AddAdditionalModel()
+    {
+        _additionalModels.Add(new AdditionalModelFormModel());
+    }
+
+    private void RemoveAdditionalModel(int index)
+    {
+        if (index >= 0 && index < _additionalModels.Count)
+            _additionalModels.RemoveAt(index);
+    }
+
+    private void OnAdditionalProviderChanged(AdditionalModelFormModel model, string provider)
+    {
+        model.Provider = provider;
+        if (DefaultEndpoints.TryGetValue(provider, out var endpoint))
+            model.EndpointUri = endpoint;
+        else
+            model.EndpointUri = string.Empty;
+    }
+
+    private static readonly HashSet<string> ReservedNames = new(StringComparer.OrdinalIgnoreCase) { "default", "embeddings" };
+
+    private string? ValidateAdditionalModelName(AdditionalModelFormModel model, int index)
+    {
+        if (string.IsNullOrWhiteSpace(model.Name))
+            return "Name is required.";
+
+        if (ReservedNames.Contains(model.Name))
+            return $"\"{model.Name}\" is reserved.";
+
+        if (!System.Text.RegularExpressions.Regex.IsMatch(model.Name, @"^[a-z0-9][a-z0-9\-]*$"))
+            return "Lowercase letters, numbers, and hyphens only.";
+
+        for (var j = 0; j < _additionalModels.Count; j++)
+        {
+            if (j != index && string.Equals(_additionalModels[j].Name, model.Name, StringComparison.OrdinalIgnoreCase))
+                return "Duplicate name.";
+        }
+
+        return null;
+    }
+
+    // === Provider change handlers ===
+
+    private void OnDefaultProviderChanged()
+    {
+        if (DefaultEndpoints.TryGetValue(_form.DefaultProvider, out var endpoint))
+            _form.DefaultEndpointUri = endpoint;
+        else
+            _form.DefaultEndpointUri = string.Empty;
+    }
+
+    private void OnEmbeddingsProviderChanged()
+    {
+        if (DefaultEndpoints.TryGetValue(_form.EmbeddingsProvider, out var endpoint))
+            _form.EmbeddingsEndpointUri = endpoint;
+        else
+            _form.EmbeddingsEndpointUri = string.Empty;
+    }
+
+    // === UI helpers ===
+
+    private static RenderFragment EndpointHint(string provider) => provider switch
+    {
+        "OpenAI" => @<span class="text-body-secondary fw-normal">(opt)</span>,
+        _ => @<text></text>
+    };
+
+    private static string EndpointPlaceholder(string provider) => provider switch
+    {
+        "Azure" => "https://your-resource.cognitiveservices.azure.com/",
+        "OpenRouter" => "https://openrouter.ai/api/v1",
+        "Grok" => "https://api.x.ai/v1",
+        "Gemini" => "https://generativelanguage.googleapis.com/v1beta/openai/",
+        _ => ""
+    };
+
+    private static string EndpointHelp(string provider) => provider switch
+    {
+        "Azure" => "Your Azure AI Foundry endpoint URL.",
+        "OpenAI" => "Leave blank for default OpenAI API.",
+        "OpenRouter" => "OpenRouter API endpoint.",
+        "Grok" => "xAI Grok API endpoint.",
+        "Gemini" => "Google Gemini OpenAI-compatible endpoint.",
+        _ => ""
+    };
+
+    private static string ModelPlaceholder(string provider) => provider switch
+    {
+        "Azure" => "e.g. gpt-4o, gpt-5-nano",
+        "OpenAI" => "e.g. gpt-4o, gpt-5-nano",
+        "OpenRouter" => "e.g. anthropic/claude-sonnet-4, openai/gpt-4o",
+        "Grok" => "e.g. grok-3",
+        "Gemini" => "e.g. gemini-2.5-flash",
+        _ => ""
+    };
 
     // === Import / Export ===
 
@@ -243,7 +639,7 @@
         try
         {
             using var stream = e.File.OpenReadStream();
-            var config = await System.Text.Json.JsonSerializer.DeserializeAsync<FabrConfigurationDto>(stream);
+            var config = await System.Text.Json.JsonSerializer.DeserializeAsync<FabrCoreConfigurationDto>(stream);
             if (config is not null)
             {
                 LoadFromConfig(config);
@@ -260,26 +656,44 @@
 
     private sealed class SetupFormModel
     {
-        // Connection (shared)
+        // Default model connection
         [Required]
-        public string Provider { get; set; } = "Azure";
-
-        public string EndpointUri { get; set; } = string.Empty;
-
+        public string DefaultProvider { get; set; } = "Azure";
+        public string DefaultEndpointUri { get; set; } = string.Empty;
         [Required]
-        public string ApiKey { get; set; } = string.Empty;
+        public string DefaultApiKey { get; set; } = string.Empty;
 
-        // Default model
+        // Default model settings
         [Required]
         public string DefaultModel { get; set; } = string.Empty;
         public int DefaultTimeoutSeconds { get; set; } = 60;
         public int? DefaultMaxOutputTokens { get; set; }
         public int? DefaultContextWindowTokens { get; set; }
 
-        // Embeddings model
+        // Shared connection toggle
+        public bool UseSharedConnection { get; set; } = true;
+
+        // Embeddings connection (when not shared)
+        public string EmbeddingsProvider { get; set; } = "OpenAI";
+        public string EmbeddingsEndpointUri { get; set; } = string.Empty;
+        public string EmbeddingsApiKey { get; set; } = string.Empty;
+
+        // Embeddings model settings
         [Required]
         public string EmbeddingsModel { get; set; } = string.Empty;
         public int EmbeddingsTimeoutSeconds { get; set; } = 60;
         public int? EmbeddingsMaxOutputTokens { get; set; }
+    }
+
+    private sealed class AdditionalModelFormModel
+    {
+        public string Name { get; set; } = string.Empty;
+        public string Provider { get; set; } = "Azure";
+        public string EndpointUri { get; set; } = string.Empty;
+        public string ApiKey { get; set; } = string.Empty;
+        public string Model { get; set; } = string.Empty;
+        public int TimeoutSeconds { get; set; } = 60;
+        public int? MaxOutputTokens { get; set; }
+        public bool ShowApiKey { get; set; }
     }
 }

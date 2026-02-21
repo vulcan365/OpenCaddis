@@ -8,9 +8,13 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Fabr.Client" Version="1.2.59-beta" />
-    <PackageReference Include="Fabr.Host" Version="1.2.59-beta" />
-    <PackageReference Include="Fabr.Sdk" Version="1.2.59-beta" />
+    <!-- FabrCore: uncomment ProjectReferences for local dev, comment out PackageReferences -->
+    <!--<ProjectReference Include="..\..\..\FabrCore\src\FabrCore.Client\FabrCore.Client.csproj" />
+    <ProjectReference Include="..\..\..\FabrCore\src\FabrCore.Host\FabrCore.Host.csproj" />
+    <ProjectReference Include="..\..\..\FabrCore\src\FabrCore.Sdk\FabrCore.Sdk.csproj" />-->
+     <PackageReference Include="FabrCore.Client" Version="0.5.50" /> 
+     <PackageReference Include="FabrCore.Host" Version="0.5.50" /> 
+     <PackageReference Include="FabrCore.Sdk" Version="0.5.50" /> 
 	  <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.3" />
 	  <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.3" />
     <PackageReference Include="Microsoft.Graph" Version="5.*" />
