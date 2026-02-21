@@ -1,14 +1,14 @@
 using System.ComponentModel;
 using System.Text.Json;
-using Fabr.Core;
-using Fabr.Sdk;
+using FabrCore.Core;
+using FabrCore.Sdk;
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
 
 namespace OpenCaddis.Agentic.Agents;
 
 [AgentAlias("eventlog")]
-public class EventLogAgent : FabrAgentProxy
+public class EventLogAgent : FabrCoreAgentProxy
 {
     private const int MaxLogEntries = 1000;
 
@@ -37,8 +37,8 @@ public class EventLogAgent : FabrAgentProxy
     public EventLogAgent(
         AgentConfiguration config,
         IServiceProvider serviceProvider,
-        IFabrAgentHost fabrAgentHost)
-        : base(config, serviceProvider, fabrAgentHost)
+        IFabrCoreAgentHost fabrcoreAgentHost)
+        : base(config, serviceProvider, fabrcoreAgentHost)
     {
     }
 
@@ -59,7 +59,7 @@ public class EventLogAgent : FabrAgentProxy
 
         (_agent, _session, _) = await CreateChatClientAgent(
             modelConfig,
-            threadId: config.Handle ?? fabrAgentHost.GetHandle(),
+            threadId: config.Handle ?? fabrcoreAgentHost.GetHandle(),
             tools: tools,
             configureOptions: opts =>
             {

@@ -1,6 +1,6 @@
 using System.Collections.Concurrent;
-using Fabr.Core;
-using Fabr.Sdk;
+using FabrCore.Core;
+using FabrCore.Sdk;
 
 namespace OpenCaddis.Agentic;
 
@@ -21,7 +21,7 @@ public static class ThinkingNotifier
     public static bool TryGetClientHandle(string agentHandle, out string clientHandle)
         => _clientHandles.TryGetValue(agentHandle, out clientHandle!);
 
-    public static async Task SendThinkingAsync(IFabrAgentHost host, string message)
+    public static async Task SendThinkingAsync(IFabrCoreAgentHost host, string message)
     {
         var agentHandle = host.GetHandle();
         if (!_clientHandles.TryGetValue(agentHandle, out var clientHandle))

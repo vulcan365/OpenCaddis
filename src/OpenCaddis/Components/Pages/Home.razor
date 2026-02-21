@@ -1,8 +1,8 @@
 @page "/"
 @rendermode InteractiveServer
-@inject FabrConfigService ConfigService
+@inject FabrCoreConfigService ConfigService
 @inject IClientContextFactory ClientContextFactory
-@inject IFabrRegistry FabrRegistry
+@inject IFabrCoreRegistry FabrCoreRegistry
 
 <PageTitle>Dashboard - OpenCaddis</PageTitle>
 
@@ -14,7 +14,7 @@
         <i class="bi bi-water hero-decoration opacity-25"></i>
         <div class="position-relative" style="z-index: 2; max-width: 65%;">
             <h1 class="h2 fw-bold">Welcome to OpenCaddis</h1>
-            <p class="mb-3 opacity-75">Your local AI agent workspace powered by Fabr. Create agents, have conversations, and build intelligent workflows.</p>
+            <p class="mb-3 opacity-75">Your local AI agent workspace powered by FabrCore. Create agents, have conversations, and build intelligent workflows.</p>
             <div class="d-flex flex-wrap gap-2">
                 <a href="/chat" class="btn btn-light fw-semibold">
                     <i class="bi bi-chat-dots me-1"></i> Start Chatting
@@ -209,7 +209,7 @@
     protected override async Task OnInitializedAsync()
     {
         _configExists = ConfigService.ConfigurationExists();
-        _agentTypes = FabrRegistry.GetAgentTypes();
+        _agentTypes = FabrCoreRegistry.GetAgentTypes();
 
         if (_configExists)
         {

@@ -2,7 +2,7 @@ using System.ComponentModel.DataAnnotations;
 
 namespace OpenCaddis.Services;
 
-public class FabrConfigurationDto
+public class FabrCoreConfigurationDto
 {
     public List<ModelConfigurationDto> ModelConfigurations { get; set; } = [];
     public List<ApiKeyConfigurationDto> ApiKeys { get; set; } = [];

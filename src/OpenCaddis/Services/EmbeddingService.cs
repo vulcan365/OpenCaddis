@@ -6,7 +6,7 @@ namespace OpenCaddis.Services;
 
 public class EmbeddingService
 {
-    private readonly FabrConfigService _configService;
+    private readonly FabrCoreConfigService _configService;
     private readonly ILogger<EmbeddingService> _logger;
     private readonly SemaphoreSlim _initLock = new(1, 1);
 
@@ -16,7 +16,7 @@ public class EmbeddingService
     private string? _apiKey;
 
     public EmbeddingService(
-        FabrConfigService configService,
+        FabrCoreConfigService configService,
         ILogger<EmbeddingService> logger)
     {
         _configService = configService;
@@ -37,13 +37,13 @@ public class EmbeddingService
             var embeddingsModel = config.ModelConfigurations
                 .FirstOrDefault(m => m.Name.Equals("embeddings", StringComparison.OrdinalIgnoreCase))
                 ?? throw new InvalidOperationException(
-                    "No 'embeddings' model configuration found in fabr.json. " +
+                    "No 'embeddings' model configuration found in fabrcore.json. " +
                     "Add a ModelConfiguration with Name='embeddings'.");
 
             var apiKey = config.ApiKeys
                 .FirstOrDefault(k => k.Alias.Equals(embeddingsModel.ApiKeyAlias, StringComparison.OrdinalIgnoreCase))
                 ?? throw new InvalidOperationException(
-                    $"API key alias '{embeddingsModel.ApiKeyAlias}' not found in fabr.json.");
+                    $"API key alias '{embeddingsModel.ApiKeyAlias}' not found in fabrcore.json.");
 
             _provider = embeddingsModel.Provider;
             _endpoint = embeddingsModel.Uri.TrimEnd('/');

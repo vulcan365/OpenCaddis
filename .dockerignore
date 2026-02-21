@@ -6,7 +6,7 @@
 .claude/
 .keys/
 src/OpenCaddis/data/
-src/OpenCaddis/fabr.json
+src/OpenCaddis/fabrcore.json
 src/OpenCaddis/opencaddis.json
 *.md
 LICENSE

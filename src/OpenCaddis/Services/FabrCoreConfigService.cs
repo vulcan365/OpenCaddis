@@ -2,7 +2,7 @@ using System.Text.Json;
 
 namespace OpenCaddis.Services;
 
-public class FabrConfigService
+public class FabrCoreConfigService
 {
     private static readonly JsonSerializerOptions SerializerOptions = new()
     {
@@ -11,21 +11,21 @@ public class FabrConfigService
 
     private readonly string _configPath;
 
-    public FabrConfigService(IWebHostEnvironment environment)
+    public FabrCoreConfigService(IWebHostEnvironment environment)
     {
-        _configPath = Path.Combine(environment.ContentRootPath, "fabr.json");
+        _configPath = Path.Combine(environment.ContentRootPath, "fabrcore.json");
     }
 
     public bool ConfigurationExists() => File.Exists(_configPath);
 
-    public async Task<FabrConfigurationDto> LoadConfigurationAsync()
+    public async Task<FabrCoreConfigurationDto> LoadConfigurationAsync()
     {
         var json = await File.ReadAllTextAsync(_configPath);
-        return JsonSerializer.Deserialize<FabrConfigurationDto>(json, SerializerOptions)
-               ?? new FabrConfigurationDto();
+        return JsonSerializer.Deserialize<FabrCoreConfigurationDto>(json, SerializerOptions)
+               ?? new FabrCoreConfigurationDto();
     }
 
-    public async Task SaveConfigurationAsync(FabrConfigurationDto configuration)
+    public async Task SaveConfigurationAsync(FabrCoreConfigurationDto configuration)
     {
         var json = JsonSerializer.Serialize(configuration, SerializerOptions);
         await File.WriteAllTextAsync(_configPath, json);

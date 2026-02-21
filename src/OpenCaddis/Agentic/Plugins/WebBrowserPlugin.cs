@@ -3,8 +3,8 @@ using System.Net;
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
-using Fabr.Core;
-using Fabr.Sdk;
+using FabrCore.Core;
+using FabrCore.Sdk;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Playwright;
@@ -14,9 +14,9 @@ using ReverseMarkdown;
 namespace OpenCaddis.Agentic.Plugins;
 
 [PluginAlias("WebBrowser")]
-public sealed class WebBrowserPlugin : IFabrPlugin
+public sealed class WebBrowserPlugin : IFabrCorePlugin
 {
-    private IFabrAgentHost? _host;
+    private IFabrCoreAgentHost? _host;
     private ILogger<WebBrowserPlugin> _logger = null!;
     private IPlaywright? _playwright;
     private IBrowser? _browser;
@@ -27,7 +27,7 @@ public sealed class WebBrowserPlugin : IFabrPlugin
 
     public async Task InitializeAsync(AgentConfiguration config, IServiceProvider serviceProvider)
     {
-        _host = serviceProvider.GetService<IFabrAgentHost>();
+        _host = serviceProvider.GetService<IFabrCoreAgentHost>();
         _logger = serviceProvider.GetRequiredService<ILogger<WebBrowserPlugin>>();
 
         var timeoutSetting = config.GetPluginSetting("WebBrowser", "TimeoutMs");
