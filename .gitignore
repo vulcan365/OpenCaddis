@@ -383,3 +383,5 @@ src/OpenCaddis/data/
 c:\temp\fabrcorefiles/
 /src/OpenCaddis/opencaddis.json
 /src/OpenCaddis/fabrcore.json
+
+.claude/
