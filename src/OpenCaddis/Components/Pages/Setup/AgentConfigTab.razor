@@ -1,7 +1,7 @@
 @using OpenCaddis.Services
 @inject OpenCaddisConfigService ConfigService
-@inject FabrConfigService FabrConfigService
-@inject IFabrRegistry FabrRegistry
+@inject FabrCoreConfigService FabrCoreConfigService
+@inject IFabrCoreRegistry FabrCoreRegistry
 @inject IJSRuntime JS
 
 <div class="d-flex flex-column gap-4">
@@ -133,16 +133,16 @@
 
         await LoadModelConfigNames();
 
-        _agentTypes = FabrRegistry.GetAgentTypes();
-        _plugins = FabrRegistry.GetPlugins();
-        _tools = FabrRegistry.GetTools();
+        _agentTypes = FabrCoreRegistry.GetAgentTypes();
+        _plugins = FabrCoreRegistry.GetPlugins();
+        _tools = FabrCoreRegistry.GetTools();
     }
 
     private async Task LoadModelConfigNames()
     {
-        if (FabrConfigService.ConfigurationExists())
+        if (FabrCoreConfigService.ConfigurationExists())
         {
-            var fabrConfig = await FabrConfigService.LoadConfigurationAsync();
+            var fabrConfig = await FabrCoreConfigService.LoadConfigurationAsync();
             _modelConfigNames = fabrConfig.ModelConfigurations.Select(m => m.Name).ToList();
         }
     }

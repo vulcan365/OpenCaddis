@@ -1,5 +1,5 @@
-using Fabr.Client;
-using Fabr.Core;
+using FabrCore.Client;
+using FabrCore.Core;
 
 namespace OpenCaddis.Services;
 
@@ -9,13 +9,13 @@ public class AgentDiscoveryService
     private const string HandlePrefix = UserHandle + ":";
 
     private readonly IClientContextFactory _clientContextFactory;
-    private readonly IFabrHostApiClient _apiClient;
+    private readonly IFabrCoreHostApiClient _apiClient;
     private readonly OpenCaddisConfigService _configService;
     private readonly ILogger<AgentDiscoveryService> _logger;
 
     public AgentDiscoveryService(
         IClientContextFactory clientContextFactory,
-        IFabrHostApiClient apiClient,
+        IFabrCoreHostApiClient apiClient,
         OpenCaddisConfigService configService,
         ILogger<AgentDiscoveryService> logger)
     {

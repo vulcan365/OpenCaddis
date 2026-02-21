@@ -1,7 +1,7 @@
 using System.Reflection;
-using Fabr.Client;
-using Fabr.Host;
-using Fabr.Sdk;
+using FabrCore.Client;
+using FabrCore.Host;
+using FabrCore.Sdk;
 using Microsoft.AspNetCore.DataProtection;
 using OpenCaddis.Components;
 using OpenCaddis.Sdk;
@@ -24,7 +24,7 @@ namespace OpenCaddis
             builder.Services.AddDataProtection()
                 .PersistKeysToFileSystem(new DirectoryInfo(keysPath))
                 .SetApplicationName("OpenCaddis");
-            builder.Services.AddSingleton<FabrConfigService>();
+            builder.Services.AddSingleton<FabrCoreConfigService>();
             builder.Services.AddSingleton<OpenCaddisConfigService>();
             builder.Services.AddSingleton<Microsoft365AuthService>();
             builder.Services.AddSingleton<AgentManagerService>();
@@ -70,8 +70,8 @@ namespace OpenCaddis
 
             builder.Services.AddOpenApi();
 
-            builder.AddFabrServer();
-            builder.AddFabrClient();
+            builder.AddFabrCoreServer();
+            builder.AddFabrCoreClient();
 
             builder.Services.AddSingleton<AgentEventLoggerProvider>();
             builder.Services.AddSingleton<ILoggerProvider>(sp =>
@@ -113,7 +113,7 @@ namespace OpenCaddis
             app.MapRazorComponents<App>()
                 .AddInteractiveServerRenderMode();
 
-            app.UseFabrServer();
+            app.UseFabrCoreServer();
 
             app.Run();
         }

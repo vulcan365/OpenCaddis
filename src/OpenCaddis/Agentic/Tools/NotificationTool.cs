@@ -1,17 +1,17 @@
 using System.ComponentModel;
-using Fabr.Core;
-using Fabr.Sdk;
+using FabrCore.Core;
+using FabrCore.Sdk;
 using Microsoft.Extensions.Logging;
 
 namespace OpenCaddis.Agentic.Tools;
 
 public class NotificationTool
 {
-    private readonly IFabrAgentHost _agentHost;
+    private readonly IFabrCoreAgentHost _agentHost;
     private readonly Func<string?> _getClientHandle;
     private readonly ILogger<NotificationTool> _logger;
 
-    public NotificationTool(IFabrAgentHost agentHost, Func<string?> getClientHandle, ILogger<NotificationTool> logger)
+    public NotificationTool(IFabrCoreAgentHost agentHost, Func<string?> getClientHandle, ILogger<NotificationTool> logger)
     {
         _agentHost = agentHost;
         _getClientHandle = getClientHandle;

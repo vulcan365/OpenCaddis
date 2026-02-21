@@ -2,17 +2,17 @@ using System.ComponentModel;
 using System.Diagnostics;
 using System.Text;
 using System.Text.RegularExpressions;
-using Fabr.Core;
-using Fabr.Sdk;
+using FabrCore.Core;
+using FabrCore.Sdk;
 using Microsoft.Extensions.Logging;
 using OpenCaddis.Agentic;
 
 namespace OpenCaddis.Agentic.Plugins;
 
 [PluginAlias("Docker")]
-public sealed class DockerPlugin : IFabrPlugin, IDisposable
+public sealed class DockerPlugin : IFabrCorePlugin, IDisposable
 {
-    private IFabrAgentHost? _host;
+    private IFabrCoreAgentHost? _host;
     private ILogger<DockerPlugin> _logger = null!;
     private Process? _shellProcess;
     private readonly SemaphoreSlim _sessionSemaphore = new(1, 1);
@@ -34,7 +34,7 @@ public sealed class DockerPlugin : IFabrPlugin, IDisposable
 
     public Task InitializeAsync(AgentConfiguration config, IServiceProvider serviceProvider)
     {
-        _host = serviceProvider.GetService<IFabrAgentHost>();
+        _host = serviceProvider.GetService<IFabrCoreAgentHost>();
         _logger = serviceProvider.GetRequiredService<ILogger<DockerPlugin>>();
 
         var timeout = config.GetPluginSetting("Docker", "TimeoutSeconds");

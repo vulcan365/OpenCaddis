@@ -1,17 +1,17 @@
 using System.ComponentModel;
 using System.Text;
-using Fabr.Core;
-using Fabr.Sdk;
+using FabrCore.Core;
+using FabrCore.Sdk;
 using Microsoft.Extensions.Logging;
 using OpenCaddis.Agentic;
 
 namespace OpenCaddis.Agentic.Plugins;
 
 [PluginAlias("FileSystem")]
-public sealed class FileSystemPlugin : IFabrPlugin, IDisposable
+public sealed class FileSystemPlugin : IFabrCorePlugin, IDisposable
 {
     private string _rootPath = Directory.GetCurrentDirectory();
-    private IFabrAgentHost? _host;
+    private IFabrCoreAgentHost? _host;
     private ILogger<FileSystemPlugin> _logger = null!;
     private readonly Dictionary<string, FileSystemWatcher> _watchers = new();
     private readonly Dictionary<string, CancellationTokenSource> _debounceCts = new();
@@ -21,7 +21,7 @@ public sealed class FileSystemPlugin : IFabrPlugin, IDisposable
 
     public Task InitializeAsync(AgentConfiguration config, IServiceProvider serviceProvider)
     {
-        _host = serviceProvider.GetService<IFabrAgentHost>();
+        _host = serviceProvider.GetService<IFabrCoreAgentHost>();
         _logger = serviceProvider.GetRequiredService<ILogger<FileSystemPlugin>>();
 
         var root = config.GetPluginSetting("FileSystem", "RootPath");

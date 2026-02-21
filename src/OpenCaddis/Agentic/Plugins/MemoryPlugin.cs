@@ -1,16 +1,16 @@
 using System.ComponentModel;
 using System.Text;
-using Fabr.Core;
-using Fabr.Sdk;
+using FabrCore.Core;
+using FabrCore.Sdk;
 using Microsoft.Extensions.Logging;
 using OpenCaddis.Services;
 
 namespace OpenCaddis.Agentic.Plugins;
 
 [PluginAlias("Memory")]
-public sealed class MemoryPlugin : IFabrPlugin
+public sealed class MemoryPlugin : IFabrCorePlugin
 {
-    private IFabrAgentHost? _host;
+    private IFabrCoreAgentHost? _host;
     private ILogger<MemoryPlugin> _logger = null!;
     private MemoryService _memoryService = null!;
     private string _agentSource = "unknown";
@@ -18,7 +18,7 @@ public sealed class MemoryPlugin : IFabrPlugin
 
     public Task InitializeAsync(AgentConfiguration config, IServiceProvider serviceProvider)
     {
-        _host = serviceProvider.GetService<IFabrAgentHost>();
+        _host = serviceProvider.GetService<IFabrCoreAgentHost>();
         _logger = serviceProvider.GetRequiredService<ILogger<MemoryPlugin>>();
         _memoryService = serviceProvider.GetRequiredService<MemoryService>();
 

@@ -1,26 +1,26 @@
 using System.ComponentModel;
 using System.Text;
-using Fabr.Client;
-using Fabr.Core;
-using Fabr.Sdk;
+using FabrCore.Client;
+using FabrCore.Core;
+using FabrCore.Sdk;
 using Microsoft.Extensions.Logging;
 using OpenCaddis.Agentic;
 
 namespace OpenCaddis.Agentic.Plugins;
 
 [PluginAlias("AgentManagement")]
-public sealed class AgentManagementPlugin : IFabrPlugin
+public sealed class AgentManagementPlugin : IFabrCorePlugin
 {
-    private IFabrAgentHost? _host;
-    private IFabrHostApiClient? _apiClient;
-    private IFabrRegistry? _registry;
+    private IFabrCoreAgentHost? _host;
+    private IFabrCoreHostApiClient? _apiClient;
+    private IFabrCoreRegistry? _registry;
     private ILogger<AgentManagementPlugin> _logger = null!;
 
     public Task InitializeAsync(AgentConfiguration config, IServiceProvider serviceProvider)
     {
-        _host = serviceProvider.GetService<IFabrAgentHost>();
-        _apiClient = serviceProvider.GetService<IFabrHostApiClient>();
-        _registry = serviceProvider.GetService<IFabrRegistry>();
+        _host = serviceProvider.GetService<IFabrCoreAgentHost>();
+        _apiClient = serviceProvider.GetService<IFabrCoreHostApiClient>();
+        _registry = serviceProvider.GetService<IFabrCoreRegistry>();
         _logger = serviceProvider.GetRequiredService<ILogger<AgentManagementPlugin>>();
 
         _logger.LogInformation("AgentManagementPlugin initialized (host: {HasHost}, apiClient: {HasApi}, registry: {HasRegistry})",
@@ -51,7 +51,7 @@ public sealed class AgentManagementPlugin : IFabrPlugin
         if (_host is null)
             return "Error: Agent host not available — cannot determine user context.";
         if (_apiClient is null)
-            return "Error: Fabr API client not available.";
+            return "Error: FabrCore API client not available.";
 
         try
         {
@@ -106,7 +106,7 @@ public sealed class AgentManagementPlugin : IFabrPlugin
         if (_host is null)
             return "Error: Agent host not available — cannot determine user context.";
         if (_apiClient is null)
-            return "Error: Fabr API client not available.";
+            return "Error: FabrCore API client not available.";
 
         try
         {
@@ -170,7 +170,7 @@ public sealed class AgentManagementPlugin : IFabrPlugin
         if (_host is not null) await ThinkingNotifier.SendThinkingAsync(_host, "Discovering capabilities...");
 
         if (_registry is null)
-            return "Error: Fabr registry not available — capability discovery is unavailable.";
+            return "Error: FabrCore registry not available — capability discovery is unavailable.";
 
         try
         {
@@ -223,7 +223,7 @@ public sealed class AgentManagementPlugin : IFabrPlugin
         if (_host is not null) await ThinkingNotifier.SendThinkingAsync(_host, "Listing agents...");
 
         if (_apiClient is null)
-            return "Error: Fabr API client not available.";
+            return "Error: FabrCore API client not available.";
 
         try
         {
@@ -263,7 +263,7 @@ public sealed class AgentManagementPlugin : IFabrPlugin
         if (_host is not null) await ThinkingNotifier.SendThinkingAsync(_host, $"Getting details for '{key}'...");
 
         if (_apiClient is null)
-            return "Error: Fabr API client not available.";
+            return "Error: FabrCore API client not available.";
 
         try
         {
@@ -300,7 +300,7 @@ public sealed class AgentManagementPlugin : IFabrPlugin
         if (_host is not null) await ThinkingNotifier.SendThinkingAsync(_host, "Getting agent statistics...");
 
         if (_apiClient is null)
-            return "Error: Fabr API client not available.";
+            return "Error: FabrCore API client not available.";
 
         try
         {
@@ -330,7 +330,7 @@ public sealed class AgentManagementPlugin : IFabrPlugin
         if (_host is not null) await ThinkingNotifier.SendThinkingAsync(_host, "Purging old agents...");
 
         if (_apiClient is null)
-            return "Error: Fabr API client not available.";
+            return "Error: FabrCore API client not available.";
 
         try
         {

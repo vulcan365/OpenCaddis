@@ -1,6 +1,6 @@
 # OpenCaddis
 
-OpenCaddis is an AI agent orchestration app built with [Blazor Server](https://learn.microsoft.com/en-us/aspnet/core/blazor/) and the [Fabr](https://github.com/vulcan365/Fabr) agent framework. It provides a web-based chat interface for interacting with multiple AI agents, each equipped with configurable plugins and tools.
+OpenCaddis is an AI agent orchestration app built with [Blazor Server](https://learn.microsoft.com/en-us/aspnet/core/blazor/) and the [FabrCore](https://github.com/vulcan365/FabrCore) agent framework. It provides a web-based chat interface for interacting with multiple AI agents, each equipped with configurable plugins and tools.
 
 ## Features
 
@@ -43,13 +43,13 @@ OpenCaddis is an AI agent orchestration app built with [Blazor Server](https://l
 2. **Copy the example config files**
 
    ```bash
-   cp src/OpenCaddis/fabr.json.example src/OpenCaddis/fabr.json
+   cp src/OpenCaddis/fabrcore.json.example src/OpenCaddis/fabrcore.json
    cp src/OpenCaddis/opencaddis.json.example src/OpenCaddis/opencaddis.json
    ```
 
 3. **Configure your API keys**
 
-   Edit `src/OpenCaddis/fabr.json`:
+   Edit `src/OpenCaddis/fabrcore.json`:
    - Replace `YOUR_AZURE_ENDPOINT` with your Azure OpenAI resource URL
    - Replace `YOUR_API_KEY` with your API key
 
@@ -97,13 +97,13 @@ To persist configuration across `docker rm`, bind-mount the config files. Create
 
 Linux / macOS:
 ```bash
-cp src/OpenCaddis/fabr.json.example fabr.json
+cp src/OpenCaddis/fabrcore.json.example fabrcore.json
 cp src/OpenCaddis/opencaddis.json.example opencaddis.json
 ```
 
 Windows (PowerShell):
 ```powershell
-copy src\OpenCaddis\fabr.json.example fabr.json
+copy src\OpenCaddis\fabrcore.json.example fabrcore.json
 copy src\OpenCaddis\opencaddis.json.example opencaddis.json
 ```
 
@@ -113,7 +113,7 @@ Linux / macOS:
 ```bash
 docker run -d \
   -p 5000:5000 \
-  -v ./fabr.json:/app/fabr.json \
+  -v ./fabrcore.json:/app/fabrcore.json \
   -v ./opencaddis.json:/app/opencaddis.json \
   -v opencaddis-data:/app/data \
   -v opencaddis-keys:/app/.keys \
@@ -125,7 +125,7 @@ Windows (PowerShell):
 ```powershell
 docker run -d `
   -p 5000:5000 `
-  -v ${PWD}\fabr.json:/app/fabr.json `
+  -v ${PWD}\fabrcore.json:/app/fabrcore.json `
   -v ${PWD}\opencaddis.json:/app/opencaddis.json `
   -v opencaddis-data:/app/data `
   -v opencaddis-keys:/app/.keys `
@@ -195,9 +195,9 @@ docker compose up -d
 
 ## Configuration
 
-### fabr.json
+### fabrcore.json
 
-Configures AI model endpoints and API keys used by the Fabr framework. Requires at minimum:
+Configures AI model endpoints and API keys used by the FabrCore framework. Requires at minimum:
 
 - **`default`** -- a chat/completion model (e.g., `gpt-4o`, `gpt-5-nano`)
 - **`embeddings`** -- a text embedding model (e.g., `text-embedding-ada-002`)
@@ -208,7 +208,7 @@ Defines agents, their plugins, system prompts, and per-plugin settings. Each age
 
 - **Handle** -- display name and routing identifier
 - **AgentType** -- `assistant` (standard) or `thinking` (plan-execute loop)
-- **Models** -- which model configuration to use from `fabr.json`
+- **Models** -- which model configuration to use from `fabrcore.json`
 - **Plugins** -- list of plugin aliases to attach
 - **Args** -- per-plugin settings (e.g., `"FileSystem:RootPath"`, `"PowerShell:TimeoutSeconds"`)
 
@@ -249,4 +249,4 @@ This project is licensed under the [MIT License](LICENSE).
 
 ## Acknowledgments
 
-Built on the [Fabr](https://github.com/vulcan365/Fabr) agent framework (Apache 2.0).
+Built on the [FabrCore](https://github.com/vulcan365/FabrCore) agent framework (Apache 2.0).

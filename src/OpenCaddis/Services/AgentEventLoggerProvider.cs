@@ -1,14 +1,14 @@
 using System.Text.Json;
 using System.Threading.Channels;
-using Fabr.Client;
-using Fabr.Core;
+using FabrCore.Client;
+using FabrCore.Core;
 
 namespace OpenCaddis.Services;
 
 public sealed class AgentEventLoggerProvider : ILoggerProvider
 {
     private static readonly string[] SuppressedPrefixes =
-        ["Fabr.", "Orleans.", "OpenCaddis.Services.AgentEventLoggerProvider"];
+        ["FabrCore.", "Orleans.", "OpenCaddis.Services.AgentEventLoggerProvider"];
 
     private static readonly AsyncLocal<bool> _isForwarding = new();
 

@@ -4,7 +4,7 @@ Third-Party Software Notices
 This project includes or depends on the following third-party software:
 
 
-Fabr
+FabrCore
 ----
 Copyright (c) 2025 Vulcan365 LLC
 Licensed under the Apache License, Version 2.0
@@ -21,10 +21,10 @@ Licensed under the Apache License, Version 2.0
    See the License for the specific language governing permissions and
    limitations under the License.
 
-NOTICE (from Fabr repository):
+NOTICE (from FabrCore repository):
 
-   Fabr
+   FabrCore
    Copyright 2025 Vulcan365 LLC
 
    This product includes software developed by Vulcan365 LLC
-   (https://github.com/vulcan365/Fabr).
+   (https://github.com/vulcan365/FabrCore).

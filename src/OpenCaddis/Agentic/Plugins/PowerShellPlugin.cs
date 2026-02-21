@@ -1,8 +1,8 @@
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Text;
-using Fabr.Core;
-using Fabr.Sdk;
+using FabrCore.Core;
+using FabrCore.Sdk;
 using Microsoft.Extensions.Logging;
 using OpenCaddis.Agentic;
 using OpenCaddis.Agentic.CaddisFly;
@@ -10,9 +10,9 @@ using OpenCaddis.Agentic.CaddisFly;
 namespace OpenCaddis.Agentic.Plugins;
 
 [PluginAlias("PowerShell")]
-public sealed class PowerShellPlugin : IFabrPlugin
+public sealed class PowerShellPlugin : IFabrCorePlugin
 {
-    private IFabrAgentHost? _host;
+    private IFabrCoreAgentHost? _host;
     private ILogger<PowerShellPlugin> _logger = null!;
     private string _workingDirectory = Path.Combine(Path.GetTempPath(), "OpenCaddis") + Path.DirectorySeparatorChar;
     private int _timeoutSeconds = 30;
@@ -20,7 +20,7 @@ public sealed class PowerShellPlugin : IFabrPlugin
 
     public Task InitializeAsync(AgentConfiguration config, IServiceProvider serviceProvider)
     {
-        _host = serviceProvider.GetService<IFabrAgentHost>();
+        _host = serviceProvider.GetService<IFabrCoreAgentHost>();
         _logger = serviceProvider.GetRequiredService<ILogger<PowerShellPlugin>>();
 
         var workDir = config.GetPluginSetting("PowerShell", "WorkingDirectory");

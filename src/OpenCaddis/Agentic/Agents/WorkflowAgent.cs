@@ -1,13 +1,13 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using Fabr.Core;
-using Fabr.Sdk;
+using FabrCore.Core;
+using FabrCore.Sdk;
 using Microsoft.Extensions.AI;
 
 namespace OpenCaddis.Agentic.Agents;
 
 [AgentAlias("workflow")]
-public class WorkflowAgent : FabrAgentProxy
+public class WorkflowAgent : FabrCoreAgentProxy
 {
     private const string UserHandle = "opencaddis-user";
     private const string PlanStateKey = "workflow-plan";
@@ -29,8 +29,8 @@ public class WorkflowAgent : FabrAgentProxy
     public WorkflowAgent(
         AgentConfiguration config,
         IServiceProvider serviceProvider,
-        IFabrAgentHost fabrAgentHost)
-        : base(config, serviceProvider, fabrAgentHost)
+        IFabrCoreAgentHost fabrcoreAgentHost)
+        : base(config, serviceProvider, fabrcoreAgentHost)
     {
     }
 
@@ -72,7 +72,7 @@ public class WorkflowAgent : FabrAgentProxy
             var handle = $"{UserHandle}:{name}";
             try
             {
-                var health = await fabrAgentHost.GetAgentHealth(handle, HealthDetailLevel.Detailed);
+                var health = await fabrcoreAgentHost.GetAgentHealth(handle, HealthDetailLevel.Detailed);
                 if (health.State == HealthState.Healthy && health.IsConfigured)
                 {
                     var desc = health.Configuration?.Description is { Length: > 0 } d
@@ -107,7 +107,7 @@ public class WorkflowAgent : FabrAgentProxy
 
     public override async Task<AgentMessage> OnMessage(AgentMessage message)
     {
-        var myHandle = fabrAgentHost.GetHandle();
+        var myHandle = fabrcoreAgentHost.GetHandle();
 
         if (message.FromHandle is not null && message.FromHandle != myHandle)
         {
@@ -450,7 +450,7 @@ public class WorkflowAgent : FabrAgentProxy
             return;
         }
 
-        var myHandle = fabrAgentHost.GetHandle();
+        var myHandle = fabrcoreAgentHost.GetHandle();
 
         try
         {
@@ -468,7 +468,7 @@ public class WorkflowAgent : FabrAgentProxy
             await RecordEvent(ExecutionEventType.TaskMessageSent, plan.PlanId, task.TaskId,
                 $"Sent task to {agentInfo.Handle}");
 
-            var agentResponse = await fabrAgentHost.SendAndReceiveMessage(taskMessage);
+            var agentResponse = await fabrcoreAgentHost.SendAndReceiveMessage(taskMessage);
 
             // Process the response inline (since SendAndReceiveMessage is synchronous)
             var responseText = agentResponse.Message ?? "";
@@ -1022,8 +1022,8 @@ public class WorkflowAgent : FabrAgentProxy
     {
         if (_lastClientHandle is null) return;
 
-        var myHandle = fabrAgentHost.GetHandle();
-        await fabrAgentHost.SendMessage(new AgentMessage
+        var myHandle = fabrcoreAgentHost.GetHandle();
+        await fabrcoreAgentHost.SendMessage(new AgentMessage
         {
             ToHandle = _lastClientHandle,
             FromHandle = myHandle,
@@ -1037,8 +1037,8 @@ public class WorkflowAgent : FabrAgentProxy
     {
         if (_lastClientHandle is null) return;
 
-        var myHandle = fabrAgentHost.GetHandle();
-        await fabrAgentHost.SendMessage(new AgentMessage
+        var myHandle = fabrcoreAgentHost.GetHandle();
+        await fabrcoreAgentHost.SendMessage(new AgentMessage
         {
             ToHandle = _lastClientHandle,
             FromHandle = myHandle,

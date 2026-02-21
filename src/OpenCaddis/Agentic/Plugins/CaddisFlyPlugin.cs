@@ -1,7 +1,7 @@
 using System.ComponentModel;
 using System.Text.Json;
-using Fabr.Core;
-using Fabr.Sdk;
+using FabrCore.Core;
+using FabrCore.Sdk;
 using Microsoft.Extensions.Logging;
 using OpenCaddis.Agentic;
 using OpenCaddis.Agentic.CaddisFly;
@@ -10,9 +10,9 @@ using OpenCaddis.Services;
 namespace OpenCaddis.Agentic.Plugins;
 
 [PluginAlias("CaddisFly")]
-public sealed class CaddisFlyPlugin : IFabrPlugin
+public sealed class CaddisFlyPlugin : IFabrCorePlugin
 {
-    private IFabrAgentHost? _host;
+    private IFabrCoreAgentHost? _host;
     private ILogger<CaddisFlyPlugin> _logger = null!;
     private CaddisFlyRuntimeService _runtime = null!;
     private CaddisFlyRunStore _runStore = null!;
@@ -26,7 +26,7 @@ public sealed class CaddisFlyPlugin : IFabrPlugin
 
     public Task InitializeAsync(AgentConfiguration config, IServiceProvider serviceProvider)
     {
-        _host = serviceProvider.GetService<IFabrAgentHost>();
+        _host = serviceProvider.GetService<IFabrCoreAgentHost>();
         _logger = serviceProvider.GetRequiredService<ILogger<CaddisFlyPlugin>>();
         _runtime = serviceProvider.GetRequiredService<CaddisFlyRuntimeService>();
         _runStore = serviceProvider.GetRequiredService<CaddisFlyRunStore>();

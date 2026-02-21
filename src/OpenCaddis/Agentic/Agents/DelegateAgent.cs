@@ -1,14 +1,14 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using Fabr.Core;
-using Fabr.Sdk;
+using FabrCore.Core;
+using FabrCore.Sdk;
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
 
 namespace OpenCaddis.Agentic.Agents;
 
 [AgentAlias("delegate")]
-public class DelegateAgent : FabrAgentProxy
+public class DelegateAgent : FabrCoreAgentProxy
 {
     private const string UserHandle = "opencaddis-user";
 
@@ -29,8 +29,8 @@ public class DelegateAgent : FabrAgentProxy
     public DelegateAgent(
         AgentConfiguration config,
         IServiceProvider serviceProvider,
-        IFabrAgentHost fabrAgentHost)
-        : base(config, serviceProvider, fabrAgentHost)
+        IFabrCoreAgentHost fabrcoreAgentHost)
+        : base(config, serviceProvider, fabrcoreAgentHost)
     {
     }
 
@@ -46,7 +46,7 @@ public class DelegateAgent : FabrAgentProxy
 
         var result = await CreateChatClientAgent(
             modelConfigName,
-            threadId: config.Handle ?? fabrAgentHost.GetHandle(),
+            threadId: config.Handle ?? fabrcoreAgentHost.GetHandle(),
             tools: []
         );
 
@@ -67,7 +67,7 @@ public class DelegateAgent : FabrAgentProxy
 
     public override async Task<AgentMessage> OnMessage(AgentMessage message)
     {
-        var myHandle = fabrAgentHost.GetHandle();
+        var myHandle = fabrcoreAgentHost.GetHandle();
 
         // Only process genuine user requests on the default channel.
         //
@@ -75,7 +75,7 @@ public class DelegateAgent : FabrAgentProxy
         //  - "agent" channel: delegation responses already handled inline
         //    via SendAndReceiveMessage.
         //  - "thinking"/"status" MessageType: notifications from delegated
-        //    agents whose ThinkingNotifier targets us (Fabr delivers OneWay
+        //    agents whose ThinkingNotifier targets us (FabrCore delivers OneWay
         //    SendMessage calls through the chat stream → OnMessage).
         //  - OneWay Kind: any fire-and-forget notification, not a user request.
         if (!string.IsNullOrEmpty(message.Channel)
@@ -275,7 +275,7 @@ public class DelegateAgent : FabrAgentProxy
             var handle = $"{UserHandle}:{name}";
             try
             {
-                var health = await fabrAgentHost.GetAgentHealth(handle, HealthDetailLevel.Detailed);
+                var health = await fabrcoreAgentHost.GetAgentHealth(handle, HealthDetailLevel.Detailed);
                 if (health.State == HealthState.Healthy && health.IsConfigured)
                 {
                     var desc = health.Configuration?.Description is { Length: > 0 } d
@@ -362,7 +362,7 @@ public class DelegateAgent : FabrAgentProxy
     {
         try
         {
-            var delegationTask = fabrAgentHost.SendAndReceiveMessage(taskMessage);
+            var delegationTask = fabrcoreAgentHost.SendAndReceiveMessage(taskMessage);
             var timeoutTask = Task.Delay(TimeSpan.FromSeconds(timeoutSeconds));
 
             var completed = await Task.WhenAny(delegationTask, timeoutTask);
@@ -405,8 +405,8 @@ public class DelegateAgent : FabrAgentProxy
     {
         if (_lastClientHandle is null) return;
 
-        var myHandle = fabrAgentHost.GetHandle();
-        await fabrAgentHost.SendMessage(new AgentMessage
+        var myHandle = fabrcoreAgentHost.GetHandle();
+        await fabrcoreAgentHost.SendMessage(new AgentMessage
         {
             ToHandle = _lastClientHandle,
             FromHandle = myHandle,
