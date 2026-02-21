@@ -5,7 +5,6 @@ param(
 )
 
 if (-not (Get-Command git -ErrorAction SilentlyContinue)) { Write-Error 'git not found'; exit 1 }
-if (-not (Get-Command gh -ErrorAction SilentlyContinue)) { Write-Error 'gh CLI not found. Install from https://cli.github.com'; exit 1 }
 
 $lastTag = git tag --list 'v*.*.*' | Sort-Object { [System.Version]($_ -replace '^v', '') } | Select-Object -Last 1
 
