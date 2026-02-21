@@ -1,4 +1,5 @@
 @using OpenCaddis.Services
+@using FabrCore.Core
 @inject OpenCaddisConfigService ConfigService
 @inject FabrCoreConfigService FabrCoreConfigService
 @inject IFabrCoreRegistry FabrCoreRegistry
@@ -68,6 +69,10 @@
                                 {
                                     <span><strong>Tools:</strong> @agent.Tools.Count</span>
                                 }
+                                @if (agent.McpServers.Count > 0)
+                                {
+                                    <span><strong>MCP:</strong> @agent.McpServers.Count</span>
+                                }
                             </div>
                         </div>
                         <div class="d-flex gap-1 flex-shrink-0">
@@ -120,6 +125,9 @@
     private List<KeyValuePair<string, string>> _editingExtraArgs = [];
     private List<string> _editingPlugins = [];
     private List<string> _editingTools = [];
+    private List<McpServerConfig> _editingMcpServers = [];
+    private List<List<KeyValuePair<string, string>>> _editingMcpEnvs = [];
+    private List<List<KeyValuePair<string, string>>> _editingMcpHeaders = [];
 
     private bool IsEditing => _editingAgent is not null;
 
@@ -157,6 +165,9 @@
         _editingExtraArgs = [];
         _editingPlugins = [];
         _editingTools = [];
+        _editingMcpServers = [];
+        _editingMcpEnvs = [];
+        _editingMcpHeaders = [];
     }
 
     private void EditAgent(AgentConfigurationDto agent)
@@ -170,11 +181,24 @@
             SystemPrompt = agent.SystemPrompt,
             Args = new Dictionary<string, string>(agent.Args),
             Plugins = new List<string>(agent.Plugins),
-            Tools = new List<string>(agent.Tools)
+            Tools = new List<string>(agent.Tools),
+            McpServers = agent.McpServers.Select(s => new McpServerConfig
+            {
+                Name = s.Name,
+                TransportType = s.TransportType,
+                Command = s.Command,
+                Arguments = new List<string>(s.Arguments),
+                Env = new Dictionary<string, string>(s.Env),
+                Url = s.Url,
+                Headers = new Dictionary<string, string>(s.Headers)
+            }).ToList()
         };
         _editingAgentOriginalHandle = agent.Handle;
         _editingPlugins = new List<string>(_editingAgent.Plugins);
         _editingTools = new List<string>(_editingAgent.Tools);
+        _editingMcpServers = _editingAgent.McpServers;
+        _editingMcpEnvs = _editingMcpServers.Select(s => s.Env.Select(kv => new KeyValuePair<string, string>(kv.Key, kv.Value)).ToList()).ToList();
+        _editingMcpHeaders = _editingMcpServers.Select(s => s.Headers.Select(kv => new KeyValuePair<string, string>(kv.Key, kv.Value)).ToList()).ToList();
 
         // Parse flat Args into plugin args vs extra args
         _pluginArgValues = new(StringComparer.OrdinalIgnoreCase);
@@ -235,6 +259,25 @@
         _editingAgent.Plugins = _editingPlugins.Where(p => !string.IsNullOrWhiteSpace(p)).ToList();
         _editingAgent.Tools = _editingTools.Where(t => !string.IsNullOrWhiteSpace(t)).ToList();
 
+        // Flatten MCP env/headers KVP lists back into dictionaries, trim whitespace
+        for (var i = 0; i < _editingMcpServers.Count; i++)
+        {
+            _editingMcpServers[i].Name = _editingMcpServers[i].Name?.Trim();
+            _editingMcpServers[i].Command = _editingMcpServers[i].Command?.Trim();
+            _editingMcpServers[i].Url = _editingMcpServers[i].Url?.Trim();
+            _editingMcpServers[i].Arguments = _editingMcpServers[i].Arguments
+                .Select(a => a.Trim())
+                .Where(a => !string.IsNullOrEmpty(a))
+                .ToList();
+            _editingMcpServers[i].Env = _editingMcpEnvs[i]
+                .Where(kv => !string.IsNullOrWhiteSpace(kv.Key))
+                .ToDictionary(kv => kv.Key.Trim(), kv => kv.Value);
+            _editingMcpServers[i].Headers = _editingMcpHeaders[i]
+                .Where(kv => !string.IsNullOrWhiteSpace(kv.Key))
+                .ToDictionary(kv => kv.Key.Trim(), kv => kv.Value);
+        }
+        _editingAgent.McpServers = _editingMcpServers;
+
         if (_editingAgentOriginalHandle is not null)
         {
             var existing = _agents.First(a => a.Handle == _editingAgentOriginalHandle);
@@ -246,6 +289,7 @@
             existing.Args = _editingAgent.Args;
             existing.Plugins = _editingAgent.Plugins;
             existing.Tools = _editingAgent.Tools;
+            existing.McpServers = _editingAgent.McpServers;
         }
         else
         {
@@ -258,7 +302,8 @@
                 SystemPrompt = _editingAgent.SystemPrompt,
                 Args = _editingAgent.Args,
                 Plugins = _editingAgent.Plugins,
-                Tools = _editingAgent.Tools
+                Tools = _editingAgent.Tools,
+                McpServers = _editingAgent.McpServers
             });
         }
 
@@ -387,6 +432,129 @@
     {
         if (index >= 0 && index < _editingTools.Count)
             _editingTools.RemoveAt(index);
+    }
+
+    // === MCP Server helpers ===
+
+    private void AddMcpServer()
+    {
+        _editingMcpServers.Add(new McpServerConfig());
+        _editingMcpEnvs.Add([]);
+        _editingMcpHeaders.Add([]);
+    }
+
+    private void RemoveMcpServer(int index)
+    {
+        if (index >= 0 && index < _editingMcpServers.Count)
+        {
+            _editingMcpServers.RemoveAt(index);
+            _editingMcpEnvs.RemoveAt(index);
+            _editingMcpHeaders.RemoveAt(index);
+        }
+    }
+
+    private void UpdateMcpTransportType(int index, McpTransportType type)
+    {
+        if (index >= 0 && index < _editingMcpServers.Count)
+            _editingMcpServers[index].TransportType = type;
+    }
+
+    private void AddMcpArgument(int serverIndex)
+    {
+        if (serverIndex >= 0 && serverIndex < _editingMcpServers.Count)
+            _editingMcpServers[serverIndex].Arguments.Add(string.Empty);
+    }
+
+    private void RemoveMcpArgument(int serverIndex, int argIndex)
+    {
+        if (serverIndex >= 0 && serverIndex < _editingMcpServers.Count)
+        {
+            var args = _editingMcpServers[serverIndex].Arguments;
+            if (argIndex >= 0 && argIndex < args.Count)
+                args.RemoveAt(argIndex);
+        }
+    }
+
+    private void UpdateMcpArgument(int serverIndex, int argIndex, string value)
+    {
+        if (serverIndex >= 0 && serverIndex < _editingMcpServers.Count)
+        {
+            var args = _editingMcpServers[serverIndex].Arguments;
+            if (argIndex >= 0 && argIndex < args.Count)
+                args[argIndex] = value;
+        }
+    }
+
+    private void AddMcpEnvRow(int serverIndex)
+    {
+        if (serverIndex >= 0 && serverIndex < _editingMcpEnvs.Count)
+            _editingMcpEnvs[serverIndex].Add(new KeyValuePair<string, string>(string.Empty, string.Empty));
+    }
+
+    private void RemoveMcpEnvRow(int serverIndex, int envIndex)
+    {
+        if (serverIndex >= 0 && serverIndex < _editingMcpEnvs.Count)
+        {
+            var envs = _editingMcpEnvs[serverIndex];
+            if (envIndex >= 0 && envIndex < envs.Count)
+                envs.RemoveAt(envIndex);
+        }
+    }
+
+    private void UpdateMcpEnvKey(int serverIndex, int envIndex, string key)
+    {
+        if (serverIndex >= 0 && serverIndex < _editingMcpEnvs.Count)
+        {
+            var envs = _editingMcpEnvs[serverIndex];
+            if (envIndex >= 0 && envIndex < envs.Count)
+                envs[envIndex] = new KeyValuePair<string, string>(key, envs[envIndex].Value);
+        }
+    }
+
+    private void UpdateMcpEnvValue(int serverIndex, int envIndex, string value)
+    {
+        if (serverIndex >= 0 && serverIndex < _editingMcpEnvs.Count)
+        {
+            var envs = _editingMcpEnvs[serverIndex];
+            if (envIndex >= 0 && envIndex < envs.Count)
+                envs[envIndex] = new KeyValuePair<string, string>(envs[envIndex].Key, value);
+        }
+    }
+
+    private void AddMcpHeaderRow(int serverIndex)
+    {
+        if (serverIndex >= 0 && serverIndex < _editingMcpHeaders.Count)
+            _editingMcpHeaders[serverIndex].Add(new KeyValuePair<string, string>(string.Empty, string.Empty));
+    }
+
+    private void RemoveMcpHeaderRow(int serverIndex, int headerIndex)
+    {
+        if (serverIndex >= 0 && serverIndex < _editingMcpHeaders.Count)
+        {
+            var headers = _editingMcpHeaders[serverIndex];
+            if (headerIndex >= 0 && headerIndex < headers.Count)
+                headers.RemoveAt(headerIndex);
+        }
+    }
+
+    private void UpdateMcpHeaderKey(int serverIndex, int headerIndex, string key)
+    {
+        if (serverIndex >= 0 && serverIndex < _editingMcpHeaders.Count)
+        {
+            var headers = _editingMcpHeaders[serverIndex];
+            if (headerIndex >= 0 && headerIndex < headers.Count)
+                headers[headerIndex] = new KeyValuePair<string, string>(key, headers[headerIndex].Value);
+        }
+    }
+
+    private void UpdateMcpHeaderValue(int serverIndex, int headerIndex, string value)
+    {
+        if (serverIndex >= 0 && serverIndex < _editingMcpHeaders.Count)
+        {
+            var headers = _editingMcpHeaders[serverIndex];
+            if (headerIndex >= 0 && headerIndex < headers.Count)
+                headers[headerIndex] = new KeyValuePair<string, string>(headers[headerIndex].Key, value);
+        }
     }
 
     // === Save ===
@@ -644,6 +812,138 @@
                         else
                         {
                             <div class="text-body-secondary small">All available tools have been added.</div>
+                        }
+                    </div>
+
+                    @* === MCP Servers === *@
+                    <div class="mt-3">
+                        <div class="d-flex align-items-center gap-2 mb-2">
+                            <label class="form-label fw-medium mb-0">MCP Servers</label>
+                            <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="AddMcpServer">
+                                <i class="bi bi-plus-lg me-1"></i> Add
+                            </button>
+                        </div>
+                        @for (var si = 0; si < _editingMcpServers.Count; si++)
+                        {
+                            var serverIndex = si;
+                            var server = _editingMcpServers[serverIndex];
+                            <div class="border rounded p-3 mb-2 bg-body-tertiary">
+                                <div class="d-flex justify-content-between align-items-start mb-2">
+                                    <div class="row g-2 flex-grow-1">
+                                        <div class="col-md-5">
+                                            <label class="form-label form-label-sm mb-1">Name</label>
+                                            <input type="text" class="form-control form-control-sm" placeholder="Server name"
+                                                   value="@server.Name"
+                                                   @onchange="e => { _editingMcpServers[serverIndex].Name = e.Value?.ToString() ?? string.Empty; }" />
+                                        </div>
+                                        <div class="col-md-5">
+                                            <label class="form-label form-label-sm mb-1">Transport</label>
+                                            <select class="form-select form-select-sm"
+                                                    value="@server.TransportType"
+                                                    @onchange="e => UpdateMcpTransportType(serverIndex, Enum.Parse<McpTransportType>(e.Value?.ToString() ?? nameof(McpTransportType.Stdio)))">
+                                                <option value="@McpTransportType.Stdio">Stdio</option>
+                                                <option value="@McpTransportType.Http">Http</option>
+                                            </select>
+                                        </div>
+                                        <div class="col-md-2 d-flex align-items-end">
+                                            <button type="button" class="btn btn-outline-danger btn-sm" @onclick="() => RemoveMcpServer(serverIndex)">
+                                                <i class="bi bi-trash"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                @if (server.TransportType == McpTransportType.Stdio)
+                                {
+                                    <div class="mb-2">
+                                        <label class="form-label form-label-sm mb-1">Command</label>
+                                        <input type="text" class="form-control form-control-sm" placeholder="e.g. npx, python, docker"
+                                               value="@server.Command"
+                                               @onchange="e => { _editingMcpServers[serverIndex].Command = e.Value?.ToString() ?? string.Empty; }" />
+                                    </div>
+                                    <div class="mb-2">
+                                        <label class="form-label form-label-sm mb-1">Arguments</label>
+                                        @for (var ai = 0; ai < server.Arguments.Count; ai++)
+                                        {
+                                            var argIndex = ai;
+                                            <div class="d-flex gap-2 mb-1">
+                                                <input type="text" class="form-control form-control-sm" placeholder="Argument"
+                                                       value="@server.Arguments[argIndex]"
+                                                       @onchange="e => UpdateMcpArgument(serverIndex, argIndex, e.Value?.ToString() ?? string.Empty)" />
+                                                <button type="button" class="btn btn-outline-danger btn-sm flex-shrink-0" @onclick="() => RemoveMcpArgument(serverIndex, argIndex)">
+                                                    <i class="bi bi-x-lg"></i>
+                                                </button>
+                                            </div>
+                                        }
+                                        <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="() => AddMcpArgument(serverIndex)">
+                                            <i class="bi bi-plus-lg me-1"></i> Add Argument
+                                        </button>
+                                    </div>
+                                    <div class="mb-0">
+                                        <label class="form-label form-label-sm mb-1">Environment Variables</label>
+                                        @for (var ei = 0; ei < _editingMcpEnvs[serverIndex].Count; ei++)
+                                        {
+                                            var envIndex = ei;
+                                            <div class="row g-2 mb-1 align-items-center">
+                                                <div class="col-5">
+                                                    <input type="text" class="form-control form-control-sm" placeholder="Key"
+                                                           value="@_editingMcpEnvs[serverIndex][envIndex].Key"
+                                                           @onchange="e => UpdateMcpEnvKey(serverIndex, envIndex, e.Value?.ToString() ?? string.Empty)" />
+                                                </div>
+                                                <div class="col-5">
+                                                    <input type="text" class="form-control form-control-sm" placeholder="Value"
+                                                           value="@_editingMcpEnvs[serverIndex][envIndex].Value"
+                                                           @onchange="e => UpdateMcpEnvValue(serverIndex, envIndex, e.Value?.ToString() ?? string.Empty)" />
+                                                </div>
+                                                <div class="col-2">
+                                                    <button type="button" class="btn btn-outline-danger btn-sm" @onclick="() => RemoveMcpEnvRow(serverIndex, envIndex)">
+                                                        <i class="bi bi-x-lg"></i>
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        }
+                                        <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="() => AddMcpEnvRow(serverIndex)">
+                                            <i class="bi bi-plus-lg me-1"></i> Add Env
+                                        </button>
+                                    </div>
+                                }
+                                else
+                                {
+                                    <div class="mb-2">
+                                        <label class="form-label form-label-sm mb-1">URL</label>
+                                        <input type="text" class="form-control form-control-sm" placeholder="https://example.com/mcp"
+                                               value="@server.Url"
+                                               @onchange="e => { _editingMcpServers[serverIndex].Url = e.Value?.ToString() ?? string.Empty; }" />
+                                    </div>
+                                    <div class="mb-0">
+                                        <label class="form-label form-label-sm mb-1">Headers</label>
+                                        @for (var hi = 0; hi < _editingMcpHeaders[serverIndex].Count; hi++)
+                                        {
+                                            var headerIndex = hi;
+                                            <div class="row g-2 mb-1 align-items-center">
+                                                <div class="col-5">
+                                                    <input type="text" class="form-control form-control-sm" placeholder="Header name"
+                                                           value="@_editingMcpHeaders[serverIndex][headerIndex].Key"
+                                                           @onchange="e => UpdateMcpHeaderKey(serverIndex, headerIndex, e.Value?.ToString() ?? string.Empty)" />
+                                                </div>
+                                                <div class="col-5">
+                                                    <input type="text" class="form-control form-control-sm" placeholder="Header value"
+                                                           value="@_editingMcpHeaders[serverIndex][headerIndex].Value"
+                                                           @onchange="e => UpdateMcpHeaderValue(serverIndex, headerIndex, e.Value?.ToString() ?? string.Empty)" />
+                                                </div>
+                                                <div class="col-2">
+                                                    <button type="button" class="btn btn-outline-danger btn-sm" @onclick="() => RemoveMcpHeaderRow(serverIndex, headerIndex)">
+                                                        <i class="bi bi-x-lg"></i>
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        }
+                                        <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="() => AddMcpHeaderRow(serverIndex)">
+                                            <i class="bi bi-plus-lg me-1"></i> Add Header
+                                        </button>
+                                    </div>
+                                }
+                            </div>
                         }
                     </div>
 

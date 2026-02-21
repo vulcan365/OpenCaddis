@@ -71,6 +71,7 @@ public class AgentManagerService
                     Args = agentDto.Args,
                     Plugins = agentDto.Plugins,
                     Tools = agentDto.Tools,
+                    McpServers = agentDto.McpServers,
                     ForceReconfigure = forceReconfigure
                 };
 
