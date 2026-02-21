@@ -12,9 +12,9 @@
     <!--<ProjectReference Include="..\..\..\FabrCore\src\FabrCore.Client\FabrCore.Client.csproj" />
     <ProjectReference Include="..\..\..\FabrCore\src\FabrCore.Host\FabrCore.Host.csproj" />
     <ProjectReference Include="..\..\..\FabrCore\src\FabrCore.Sdk\FabrCore.Sdk.csproj" />-->
-     <PackageReference Include="FabrCore.Client" Version="0.5.50" /> 
-     <PackageReference Include="FabrCore.Host" Version="0.5.50" /> 
-     <PackageReference Include="FabrCore.Sdk" Version="0.5.50" /> 
+     <PackageReference Include="FabrCore.Client" Version="0.5.52" /> 
+     <PackageReference Include="FabrCore.Host" Version="0.5.52" /> 
+     <PackageReference Include="FabrCore.Sdk" Version="0.5.52" /> 
 	  <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.3" />
 	  <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.3" />
     <PackageReference Include="Microsoft.Graph" Version="5.*" />
