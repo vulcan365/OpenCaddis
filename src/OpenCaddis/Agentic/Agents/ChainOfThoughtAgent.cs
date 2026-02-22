@@ -762,7 +762,6 @@ public class ChainOfThoughtAgent : FabrCoreAgentProxy
                 schemaName: typeName,
                 schemaDescription: $"Structured {typeName} response"),
             Tools = tools,
-            AllowMultipleToolCalls = false,
             Reasoning = new ReasoningOptions
             {
                 Effort = ReasoningEffort.None,
