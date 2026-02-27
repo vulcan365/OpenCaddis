@@ -46,7 +46,9 @@ public class ChainOfThoughtAgent : FabrCoreAgentProxy
 
     public override async Task OnInitialize()
     {
-        var modelConfigName = config.Args?.GetValueOrDefault("ModelConfig") ?? "default";
+        var modelConfigName = config.Models
+            ?? config.Args?.GetValueOrDefault("ModelConfig")
+            ?? "default";
         var networkTimeout = GetConfigInt("NetworkTimeoutSeconds", 180);
         _tools = await ResolveConfiguredToolsAsync();
 

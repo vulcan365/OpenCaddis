@@ -44,7 +44,9 @@ public class EventLogAgent : FabrCoreAgentProxy
 
     public override async Task OnInitialize()
     {
-        var modelConfig = config.Args?.GetValueOrDefault("ModelConfig") ?? "default";
+        var modelConfig = config.Models
+            ?? config.Args?.GetValueOrDefault("ModelConfig")
+            ?? "default";
 
         var tools = new List<AITool>
         {

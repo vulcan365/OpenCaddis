@@ -40,7 +40,9 @@ public class DelegateAgent : FabrCoreAgentProxy
 
     public override async Task OnInitialize()
     {
-        var modelConfigName = config.Args?.GetValueOrDefault("ModelConfig") ?? "default";
+        var modelConfigName = config.Models
+            ?? config.Args?.GetValueOrDefault("ModelConfig")
+            ?? "default";
 
         _routingClient = await GetChatClient(modelConfigName);
 

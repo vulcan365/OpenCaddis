@@ -40,7 +40,9 @@ public class WorkflowAgent : FabrCoreAgentProxy
 
     public override async Task OnInitialize()
     {
-        var modelConfig = config.Args?.GetValueOrDefault("ModelConfig") ?? "default";
+        var modelConfig = config.Models
+            ?? config.Args?.GetValueOrDefault("ModelConfig")
+            ?? "default";
         _planningClient = await GetChatClient(modelConfig);
         _executionClient = await GetChatClient(modelConfig);
 

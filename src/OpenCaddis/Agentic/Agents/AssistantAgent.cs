@@ -21,7 +21,9 @@ public class AssistantAgent : FabrCoreAgentProxy
 
     public override async Task OnInitialize()
     {
-        var modelConfigName = config.Args?.GetValueOrDefault("ModelConfig") ?? "default";
+        var modelConfigName = config.Models
+            ?? config.Args?.GetValueOrDefault("ModelConfig")
+            ?? "default";
         var tools = await ResolveConfiguredToolsAsync();
 
         var result = await CreateChatClientAgent(
