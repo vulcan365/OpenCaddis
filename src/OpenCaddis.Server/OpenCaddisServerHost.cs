@@ -1,23 +1,49 @@
+using FabrCore.Host;
+using FabrCore.Surface;
+using FabrCore.Surface.Contracts;
+using FabrCore.Surface.Services;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Options;
+using System.Reflection;
 
 namespace OpenCaddis.Server;
 
 public sealed class OpenCaddisServerHost : IAsyncDisposable
 {
-    private readonly WebApplication application;
+    private const string BlazorWebScriptResourceName =
+        "OpenCaddis.Server.StaticAssets.blazor.web.js";
+    private const string SurfaceStyleResourceName =
+        "OpenCaddis.Server.StaticAssets.surface.css";
+    private const string AdaptiveCardsScriptResourceName =
+        "OpenCaddis.Server.StaticAssets.adaptiveCardsSurface.js";
 
-    private OpenCaddisServerHost(WebApplication application, Uri baseUri)
+    private readonly WebApplication application;
+    private readonly AddOnAssemblyCatalog addOnCatalog;
+    private bool disposed;
+
+    private OpenCaddisServerHost(
+        WebApplication application,
+        Uri baseUri,
+        string addOnPath,
+        AddOnAssemblyCatalog addOnCatalog)
     {
         this.application = application;
+        this.addOnCatalog = addOnCatalog;
         BaseUri = baseUri;
+        AddOnPath = addOnPath;
     }
 
     public Uri BaseUri { get; }
 
-    public static OpenCaddisServerHost Create(Uri baseUri)
+    public string AddOnPath { get; }
+
+    public IReadOnlyList<Assembly> AdditionalAssemblies => addOnCatalog.Assemblies;
+
+    public static OpenCaddisServerHost Create(Uri baseUri, string addOnPath)
     {
         ArgumentNullException.ThrowIfNull(baseUri);
         if (!baseUri.IsAbsoluteUri || baseUri.Scheme != Uri.UriSchemeHttp ||
@@ -28,38 +54,135 @@ public sealed class OpenCaddisServerHost : IAsyncDisposable
                 nameof(baseUri));
         }
 
-        var builder = WebApplication.CreateBuilder(new WebApplicationOptions
+        ArgumentException.ThrowIfNullOrWhiteSpace(addOnPath);
+        var fullAddOnPath = Path.GetFullPath(addOnPath);
+        var addOnCatalog = AddOnAssemblyCatalog.Load(fullAddOnPath);
+
+        try
         {
-            ApplicationName = typeof(OpenCaddisServerHost).Assembly.FullName,
-            ContentRootPath = AppContext.BaseDirectory,
-            EnvironmentName = Environments.Production,
-            Args = []
-        });
+            var builder = WebApplication.CreateBuilder(new WebApplicationOptions
+            {
+                ApplicationName = typeof(OpenCaddisServerHost).Assembly.GetName().Name,
+                ContentRootPath = AppContext.BaseDirectory,
+                EnvironmentName = Environments.Production,
+                Args = []
+            });
 
-        builder.WebHost.UseUrls(baseUri.ToString());
+            builder.WebHost.UseUrls(baseUri.ToString());
 
-        // FabrCore's advertised URL is separate from Kestrel's listen URL. Keeping
-        // both aligned here makes this host ready for FabrCore server registration.
-        builder.Configuration["FabrCore:HostUrl"] = baseUri.ToString();
+            // FabrCore's advertised URL is separate from Kestrel's listen URL. Keeping
+            // both aligned here makes this host ready for FabrCore server registration.
+            builder.Configuration["FabrCore:HostUrl"] = baseUri.ToString();
 
-        var application = builder.Build();
-        application.MapGet("/", () => Results.Content(HomePageHtml, "text/html"));
-        application.MapGet("/health", () => Results.Ok(new
+            builder.Services.AddRazorComponents()
+                .AddInteractiveServerComponents();
+
+            var additionalAssemblies = new List<Assembly>
+            {
+                typeof(SurfaceMessageTypes).Assembly
+            };
+            additionalAssemblies.AddRange(addOnCatalog.Assemblies);
+
+            builder.AddFabrCoreServer(new FabrCoreServerOptions
+            {
+                AdditionalAssemblies = additionalAssemblies
+            });
+
+            var surfaceDefinitionPath = Path.Combine(AppContext.BaseDirectory, "fabrcore-surface.json");
+            builder.AddFabrCoreSurfaceFromConfig(surfaceDefinitionPath, "default");
+            builder.Services.AddFabrCoreSurfaceComponents();
+            builder.Services.Configure<SurfaceOptions>(options =>
+            {
+                options.FabrCoreHostUrl = baseUri.ToString();
+                options.DevelopmentFallbackPrincipalId = "local-user";
+                options.EnableAgentDirectory = true;
+                options.EnableAgentChat = true;
+                options.EnableLiveStatus = true;
+                options.EnableSharedAgents = true;
+                options.EnableAdaptiveCards = true;
+                options.EnableAgentCreate = false;
+                options.EnableDiagnostics = true;
+            });
+
+            var application = builder.Build();
+            application.UseAntiforgery();
+            application.UseFabrCoreServer(new FabrCoreServerOptions());
+            MapEmbeddedAsset(
+                application,
+                "/_framework/blazor.web.js",
+                BlazorWebScriptResourceName,
+                "text/javascript; charset=utf-8");
+            MapEmbeddedAsset(
+                application,
+                "/_content/FabrCore.Surface/surface.css",
+                SurfaceStyleResourceName,
+                "text/css; charset=utf-8");
+            MapEmbeddedAsset(
+                application,
+                "/_content/FabrCore.Surface/adaptiveCardsSurface.js",
+                AdaptiveCardsScriptResourceName,
+                "text/javascript; charset=utf-8");
+
+            application.MapRazorComponents<Components.App>()
+                .AddInteractiveServerRenderMode()
+                .AddFabrCoreSurfaceRoutes();
+
+            application.MapGet("/", () => Results.Content(HomePageHtml, "text/html"));
+            application.MapGet("/addons", () => Results.Ok(new
+            {
+                Path = fullAddOnPath,
+                Count = addOnCatalog.Assemblies.Count,
+                Assemblies = addOnCatalog.Assemblies.Select(assembly => assembly.FullName).ToArray()
+            }));
+
+            return new OpenCaddisServerHost(application, baseUri, fullAddOnPath, addOnCatalog);
+        }
+        catch
         {
-            Status = "Healthy",
-            Timestamp = DateTimeOffset.UtcNow
-        }));
-
-        return new OpenCaddisServerHost(application, baseUri);
+            addOnCatalog.Dispose();
+            throw;
+        }
     }
 
     public Task StartAsync(CancellationToken cancellationToken = default) =>
         application.StartAsync(cancellationToken);
 
+    private static void MapEmbeddedAsset(
+        WebApplication application,
+        string route,
+        string resourceName,
+        string contentType)
+    {
+        application.MapGet(route, () =>
+        {
+            var stream = typeof(OpenCaddisServerHost).Assembly
+                .GetManifestResourceStream(resourceName)
+                ?? throw new InvalidOperationException($"Embedded web asset '{resourceName}' is missing.");
+
+            return Results.Stream(stream, contentType);
+        });
+    }
+
     public Task StopAsync(CancellationToken cancellationToken = default) =>
         application.StopAsync(cancellationToken);
 
-    public ValueTask DisposeAsync() => application.DisposeAsync();
+    public async ValueTask DisposeAsync()
+    {
+        if (disposed)
+        {
+            return;
+        }
+
+        disposed = true;
+        try
+        {
+            await application.DisposeAsync();
+        }
+        finally
+        {
+            addOnCatalog.Dispose();
+        }
+    }
 
     private const string HomePageHtml = """
         <!doctype html>

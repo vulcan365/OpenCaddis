@@ -1,0 +1,11 @@
+{
+  "surfaces": [
+    {
+      "name": "default",
+      "description": "OpenCaddis local Surface command center.",
+      "planningModelName": "default",
+      "enableDiagnostics": true,
+      "systemPrompt": "Prefer concise display-only Adaptive Cards. Do not include executable actions in planner-generated cards."
+    }
+  ]
+}

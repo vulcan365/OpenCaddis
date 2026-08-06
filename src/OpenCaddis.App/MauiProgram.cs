@@ -18,6 +18,7 @@ namespace OpenCaddis.App
             builder.Services.AddSingleton<Services.ServerController>();
             builder.Services.AddSingleton<MainPage>();
             builder.Services.AddSingleton<ServerPage>();
+            builder.Services.AddSingleton<SurfacePage>();
             builder.Services.AddSingleton<AppShell>();
 
 #if DEBUG

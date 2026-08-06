@@ -25,4 +25,13 @@
             Route="server-page" />
     </FlyoutItem>
 
+    <FlyoutItem
+        Title="Surface"
+        Route="surface">
+        <ShellContent
+            x:Name="SurfaceContent"
+            Title="Surface"
+            Route="surface-page" />
+    </FlyoutItem>
+
 </Shell>

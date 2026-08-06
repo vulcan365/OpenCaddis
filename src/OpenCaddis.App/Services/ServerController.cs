@@ -16,6 +16,7 @@ public sealed class ServerController : IDisposable
 {
     private const int DefaultPort = 5083;
     private const string PortPreferenceKey = "OpenCaddis.Server.Port";
+    private const string AddOnPathPreferenceKey = "OpenCaddis.Server.AddOnPath";
     private readonly SemaphoreSlim lifecycleLock = new(1, 1);
     private OpenCaddisServerHost? serverHost;
     private bool disposed;
@@ -23,6 +24,10 @@ public sealed class ServerController : IDisposable
     public ServerController()
     {
         CurrentPort = Preferences.Default.Get(PortPreferenceKey, DefaultPort);
+        var defaultAddOnPath = Path.Combine(FileSystem.Current.AppDataDirectory, "AddOns");
+        CurrentAddOnPath = NormalizeAddOnPath(
+            Preferences.Default.Get(AddOnPathPreferenceKey, defaultAddOnPath));
+        Directory.CreateDirectory(CurrentAddOnPath);
     }
 
     public event EventHandler? StatusChanged;
@@ -33,13 +38,21 @@ public sealed class ServerController : IDisposable
 
     public int CurrentPort { get; private set; }
 
+    public string CurrentAddOnPath { get; private set; }
+
+    public int LoadedAddOnAssemblyCount { get; private set; }
+
     public Uri ServerUri => CreateServerUri(CurrentPort);
 
     public static Uri CreateServerUri(int port) => new($"http://localhost:{port}/");
 
-    public async Task StartAsync(int port, CancellationToken cancellationToken = default)
+    public async Task StartAsync(
+        int port,
+        string addOnPath,
+        CancellationToken cancellationToken = default)
     {
         ValidatePort(port);
+        var normalizedAddOnPath = NormalizeAddOnPath(addOnPath);
         await lifecycleLock.WaitAsync(cancellationToken);
         try
         {
@@ -49,7 +62,7 @@ public sealed class ServerController : IDisposable
                 return;
             }
 
-            await StartCoreAsync(port, cancellationToken);
+            await StartCoreAsync(port, normalizedAddOnPath, cancellationToken);
         }
         finally
         {
@@ -71,15 +84,19 @@ public sealed class ServerController : IDisposable
         }
     }
 
-    public async Task RestartAsync(int port, CancellationToken cancellationToken = default)
+    public async Task RestartAsync(
+        int port,
+        string addOnPath,
+        CancellationToken cancellationToken = default)
     {
         ValidatePort(port);
+        var normalizedAddOnPath = NormalizeAddOnPath(addOnPath);
         await lifecycleLock.WaitAsync(cancellationToken);
         try
         {
             ObjectDisposedException.ThrowIf(disposed, this);
             await StopCoreAsync(cancellationToken);
-            await StartCoreAsync(port, cancellationToken);
+            await StartCoreAsync(port, normalizedAddOnPath, cancellationToken);
         }
         finally
         {
@@ -123,19 +140,28 @@ public sealed class ServerController : IDisposable
         }
     }
 
-    private async Task StartCoreAsync(int port, CancellationToken cancellationToken)
+    private async Task StartCoreAsync(
+        int port,
+        string addOnPath,
+        CancellationToken cancellationToken)
     {
         CurrentPort = port;
+        CurrentAddOnPath = addOnPath;
+        Directory.CreateDirectory(CurrentAddOnPath);
         Preferences.Default.Set(PortPreferenceKey, port);
-        SetStatus(ServerState.Starting, $"Starting at {ServerUri}...");
+        Preferences.Default.Set(AddOnPathPreferenceKey, CurrentAddOnPath);
+        SetStatus(ServerState.Starting, $"Loading add-ons from {CurrentAddOnPath}...");
 
         OpenCaddisServerHost? newHost = null;
         try
         {
-            newHost = OpenCaddisServerHost.Create(ServerUri);
+            newHost = OpenCaddisServerHost.Create(ServerUri, CurrentAddOnPath);
             await newHost.StartAsync(cancellationToken);
             serverHost = newHost;
-            SetStatus(ServerState.Running, $"Running at {ServerUri}");
+            LoadedAddOnAssemblyCount = newHost.AdditionalAssemblies.Count;
+            SetStatus(
+                ServerState.Running,
+                $"Running at {ServerUri} with {LoadedAddOnAssemblyCount} add-on assemblies.");
         }
         catch (Exception exception)
         {
@@ -173,6 +199,7 @@ public sealed class ServerController : IDisposable
         finally
         {
             await host.DisposeAsync();
+            LoadedAddOnAssemblyCount = 0;
         }
     }
 
@@ -189,5 +216,11 @@ public sealed class ServerController : IDisposable
         {
             throw new ArgumentOutOfRangeException(nameof(port), "The port must be from 1 to 65535.");
         }
+    }
+
+    public static string NormalizeAddOnPath(string addOnPath)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(addOnPath);
+        return Path.GetFullPath(Environment.ExpandEnvironmentVariables(addOnPath.Trim()));
     }
 }

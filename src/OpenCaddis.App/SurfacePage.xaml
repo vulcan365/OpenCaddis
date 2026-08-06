@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="OpenCaddis.App.SurfacePage"
+             Title="Surface">
+
+    <Grid>
+        <WebView
+            x:Name="SurfaceWebView"
+            IsVisible="False"
+            HorizontalOptions="Fill"
+            VerticalOptions="Fill" />
+
+        <Grid
+            x:Name="UnavailableView"
+            Padding="48"
+            BackgroundColor="{AppThemeBinding Light={StaticResource White}, Dark={StaticResource OffBlack}}">
+            <VerticalStackLayout
+                HorizontalOptions="Center"
+                VerticalOptions="Center"
+                Spacing="12">
+                <Label
+                    Text="Surface is unavailable"
+                    FontSize="28"
+                    FontFamily="OpenSansSemibold"
+                    HorizontalTextAlignment="Center" />
+                <Label
+                    x:Name="UnavailableMessageLabel"
+                    Text="Start OpenCaddis Server to use Surface."
+                    FontSize="16"
+                    HorizontalTextAlignment="Center"
+                    TextColor="{AppThemeBinding Light={StaticResource Gray600}, Dark={StaticResource Gray200}}" />
+            </VerticalStackLayout>
+        </Grid>
+    </Grid>
+</ContentPage>

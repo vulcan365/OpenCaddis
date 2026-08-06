@@ -11,20 +11,21 @@ public partial class ServerPage : ContentPage
         InitializeComponent();
         this.serverController = serverController;
         PortEntry.Text = serverController.CurrentPort.ToString();
+        AddOnPathEntry.Text = serverController.CurrentAddOnPath;
         serverController.StatusChanged += OnServerStatusChanged;
         RefreshStatus();
     }
 
     private async void OnStartClicked(object? sender, EventArgs e)
     {
-        if (!TryGetPort(out var port))
+        if (!TryGetSettings(out var port, out var addOnPath))
         {
             return;
         }
 
         try
         {
-            await serverController.StartAsync(port);
+            await serverController.StartAsync(port, addOnPath);
         }
         catch (Exception exception)
         {
@@ -46,14 +47,14 @@ public partial class ServerPage : ContentPage
 
     private async void OnRestartClicked(object? sender, EventArgs e)
     {
-        if (!TryGetPort(out var port))
+        if (!TryGetSettings(out var port, out var addOnPath))
         {
             return;
         }
 
         try
         {
-            await serverController.RestartAsync(port);
+            await serverController.RestartAsync(port, addOnPath);
         }
         catch (Exception exception)
         {
@@ -73,15 +74,25 @@ public partial class ServerPage : ContentPage
             : "Enter a port from 1 to 65535";
     }
 
-    private bool TryGetPort(out int port)
+    private bool TryGetSettings(out int port, out string addOnPath)
     {
-        if (int.TryParse(PortEntry.Text, out port) && port is >= 1 and <= 65535)
+        addOnPath = string.Empty;
+        if (!int.TryParse(PortEntry.Text, out port) || port is < 1 or > 65535)
         {
-            return true;
+            _ = DisplayAlertAsync("Invalid port", "Enter a port from 1 to 65535.", "OK");
+            return false;
         }
 
-        _ = DisplayAlertAsync("Invalid port", "Enter a port from 1 to 65535.", "OK");
-        return false;
+        try
+        {
+            addOnPath = ServerController.NormalizeAddOnPath(AddOnPathEntry.Text ?? string.Empty);
+            return true;
+        }
+        catch (Exception exception) when (exception is ArgumentException or NotSupportedException)
+        {
+            _ = DisplayAlertAsync("Invalid add-on path", exception.Message, "OK");
+            return false;
+        }
     }
 
     private void OnServerStatusChanged(object? sender, EventArgs e)
@@ -98,6 +109,7 @@ public partial class ServerPage : ContentPage
         var isRunning = serverController.State == ServerState.Running;
 
         PortEntry.IsEnabled = !isBusy && !isRunning;
+        AddOnPathEntry.IsEnabled = !isBusy && !isRunning;
         StartButton.IsEnabled = !isBusy && !isRunning;
         StopButton.IsEnabled = !isBusy && isRunning;
         RestartButton.IsEnabled = !isBusy && isRunning;

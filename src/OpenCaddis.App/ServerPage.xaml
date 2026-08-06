@@ -65,6 +65,19 @@
                             TextColor="{StaticResource Primary}" />
                     </VerticalStackLayout>
 
+                    <VerticalStackLayout Spacing="8">
+                        <Label Text="Add-on assemblies path" FontFamily="OpenSansSemibold" />
+                        <Entry
+                            x:Name="AddOnPathEntry"
+                            HorizontalOptions="Fill"
+                            ClearButtonVisibility="WhileEditing"
+                            SemanticProperties.Description="Directory containing server add-on assemblies" />
+                        <Label
+                            Text="Managed DLLs in this directory are read each time the server starts or restarts."
+                            FontSize="12"
+                            TextColor="{AppThemeBinding Light={StaticResource Gray600}, Dark={StaticResource Gray200}}" />
+                    </VerticalStackLayout>
+
                     <HorizontalStackLayout Spacing="12">
                         <Button x:Name="StartButton" Text="Start" Clicked="OnStartClicked" />
                         <Button x:Name="StopButton" Text="Stop" Clicked="OnStopClicked" />
