@@ -9,15 +9,22 @@ public partial class BuilderPage : ContentPage
     private const string SolutionPathPreferenceKey = "OpenCaddis.Builder.SolutionPath";
     private readonly ServerController serverController;
     private readonly BuilderWorkspaceService workspaceService;
+    private readonly AddonBuilderAgentProvisioner agentProvisioner;
     private bool isBusy;
+    private bool isLoadingProjects;
+    private bool projectsRefreshPending;
+    private string? loadedSolutionFilePath;
+    private string? loadingSolutionFilePath;
 
     public BuilderPage(
         ServerController serverController,
-        BuilderWorkspaceService workspaceService)
+        BuilderWorkspaceService workspaceService,
+        AddonBuilderAgentProvisioner agentProvisioner)
     {
         InitializeComponent();
         this.serverController = serverController;
         this.workspaceService = workspaceService;
+        this.agentProvisioner = agentProvisioner;
 
         var defaultSolutionPath = Path.Combine(GetDefaultWorkspaceRoot(), "OpenCaddis");
         SolutionPathEntry.Text = Preferences.Default.Get(
@@ -126,6 +133,63 @@ public partial class BuilderPage : ContentPage
         }
     }
 
+    private async void OnRefreshProjectsClicked(object? sender, EventArgs e)
+    {
+        if (!TryGetWorkspace(out var workspace) || !workspace.HasSolution)
+        {
+            return;
+        }
+
+        loadedSolutionFilePath = null;
+        await RefreshProjectsAsync(workspace);
+    }
+
+    private async void OnCreateAgentClicked(object? sender, EventArgs e)
+    {
+        if (sender is not Button button ||
+            button.CommandParameter is not BuilderProjectInfo project ||
+            !TryGetWorkspace(out var workspace) ||
+            !workspace.HasSolution ||
+            !IsBuilderRunning)
+        {
+            return;
+        }
+
+        button.IsEnabled = false;
+        button.Text = "Creating...";
+        OperationPanel.IsVisible = true;
+        OperationActivityIndicator.IsVisible = true;
+        OperationActivityIndicator.IsRunning = true;
+        OperationStatusLabel.Text = $"Creating coding agent for {project.Name}...";
+        try
+        {
+            var health = await agentProvisioner.CreateAgentAsync(
+                serverController.ServerUri,
+                project,
+                workspace.SolutionFilePath!,
+                serverController.CurrentAddOnPath);
+            button.Text = "Agent ready";
+            OperationStatusLabel.Text =
+                $"{health.Handle} is {health.State}. Open Surface to chat with it.";
+            CommandOutputEditor.Text = health.Message;
+            CommandOutputEditor.IsVisible = !string.IsNullOrWhiteSpace(health.Message);
+        }
+        catch (Exception exception)
+        {
+            button.Text = "Retry agent";
+            button.IsEnabled = IsBuilderRunning;
+            OperationStatusLabel.Text = $"Could not create the coding agent for {project.Name}.";
+            CommandOutputEditor.Text = exception.Message;
+            CommandOutputEditor.IsVisible = true;
+            await DisplayAlertAsync("Agent creation failed", exception.Message, "OK");
+        }
+        finally
+        {
+            OperationActivityIndicator.IsRunning = false;
+            OperationActivityIndicator.IsVisible = false;
+        }
+    }
+
     private void OnServerStatusChanged(object? sender, EventArgs e)
     {
         Dispatcher.Dispatch(RefreshPage);
@@ -167,6 +231,7 @@ public partial class BuilderPage : ContentPage
             SolutionStatusLabel.Text = "Enter the folder where the .NET solution will live.";
             CreateSolutionButton.IsVisible = false;
             NewProjectButton.IsEnabled = false;
+            ClearProjects();
             return;
         }
 
@@ -179,6 +244,16 @@ public partial class BuilderPage : ContentPage
                     $"Solution ready: {Path.GetFileName(workspace.SolutionFilePath)}";
                 CreateSolutionButton.IsVisible = false;
                 NewProjectButton.IsEnabled = true;
+                ProjectsPanel.IsVisible = true;
+                if (!string.Equals(
+                        loadedSolutionFilePath,
+                        workspace.SolutionFilePath,
+                        OperatingSystem.IsWindows()
+                            ? StringComparison.OrdinalIgnoreCase
+                            : StringComparison.Ordinal))
+                {
+                    _ = RefreshProjectsAsync(workspace);
+                }
                 return;
             }
 
@@ -188,6 +263,7 @@ public partial class BuilderPage : ContentPage
                     "More than one solution was found. Keep exactly one .sln or .slnx file in this folder.";
                 CreateSolutionButton.IsVisible = false;
                 NewProjectButton.IsEnabled = false;
+                ClearProjects();
                 return;
             }
 
@@ -197,6 +273,7 @@ public partial class BuilderPage : ContentPage
             CreateSolutionButton.IsVisible = true;
             CreateSolutionButton.IsEnabled = true;
             NewProjectButton.IsEnabled = false;
+            ClearProjects();
         }
         catch (Exception exception) when (
             exception is ArgumentException or NotSupportedException or IOException or
@@ -205,6 +282,63 @@ public partial class BuilderPage : ContentPage
             SolutionStatusLabel.Text = exception.Message;
             CreateSolutionButton.IsVisible = false;
             NewProjectButton.IsEnabled = false;
+            ClearProjects();
+        }
+    }
+
+    private async Task RefreshProjectsAsync(BuilderWorkspaceInfo workspace)
+    {
+        if (!workspace.HasSolution || !IsBuilderRunning)
+        {
+            return;
+        }
+
+        if (isLoadingProjects)
+        {
+            projectsRefreshPending |= !PathsEqual(
+                loadingSolutionFilePath,
+                workspace.SolutionFilePath);
+            return;
+        }
+
+        isLoadingProjects = true;
+        loadingSolutionFilePath = workspace.SolutionFilePath;
+        ProjectsPanel.IsVisible = true;
+        ProjectsActivityIndicator.IsVisible = true;
+        ProjectsActivityIndicator.IsRunning = true;
+        RefreshProjectsButton.IsEnabled = false;
+        ProjectsStatusLabel.Text = "Loading projects through Roslyn...";
+        try
+        {
+            var projects = await workspaceService.GetProjectsAsync(workspace.SolutionDirectory);
+            ProjectsCollectionView.ItemsSource = projects;
+            loadedSolutionFilePath = workspace.SolutionFilePath;
+            ProjectsStatusLabel.Text = projects.Count == 1
+                ? "1 project found."
+                : $"{projects.Count} projects found.";
+        }
+        catch (Exception exception)
+        {
+            ProjectsCollectionView.ItemsSource = null;
+            loadedSolutionFilePath = null;
+            ProjectsStatusLabel.Text = $"Unable to load projects: {exception.Message}";
+        }
+        finally
+        {
+            isLoadingProjects = false;
+            loadingSolutionFilePath = null;
+            ProjectsActivityIndicator.IsRunning = false;
+            ProjectsActivityIndicator.IsVisible = false;
+            RefreshProjectsButton.IsEnabled = IsBuilderRunning && !isBusy;
+            if (projectsRefreshPending)
+            {
+                projectsRefreshPending = false;
+                loadedSolutionFilePath = null;
+                if (TryGetWorkspace(out var currentWorkspace) && currentWorkspace.HasSolution)
+                {
+                    _ = RefreshProjectsAsync(currentWorkspace);
+                }
+            }
         }
     }
 
@@ -222,6 +356,7 @@ public partial class BuilderPage : ContentPage
         try
         {
             var result = await operation();
+            loadedSolutionFilePath = null;
             OperationStatusLabel.Text = successMessage;
             CommandOutputEditor.Text = result.Output;
             CommandOutputEditor.IsVisible = !string.IsNullOrWhiteSpace(result.Output);
@@ -257,6 +392,7 @@ public partial class BuilderPage : ContentPage
         ProjectNameEntry.IsEnabled = !busy;
         CreateProjectButton.IsEnabled = !busy;
         CancelProjectButton.IsEnabled = !busy;
+        RefreshProjectsButton.IsEnabled = !busy && !isLoadingProjects;
     }
 
     private bool TryGetSolutionPath(out string solutionPath)
@@ -277,6 +413,43 @@ public partial class BuilderPage : ContentPage
             return false;
         }
     }
+
+    private bool TryGetWorkspace(out BuilderWorkspaceInfo workspace)
+    {
+        workspace = default!;
+        if (!TryGetSolutionPath(out var solutionPath))
+        {
+            return false;
+        }
+
+        try
+        {
+            workspace = workspaceService.Inspect(solutionPath);
+            return true;
+        }
+        catch (Exception exception) when (
+            exception is ArgumentException or NotSupportedException or IOException or
+                UnauthorizedAccessException)
+        {
+            _ = DisplayAlertAsync("Unable to inspect solution", exception.Message, "OK");
+            return false;
+        }
+    }
+
+    private void ClearProjects()
+    {
+        ProjectsPanel.IsVisible = false;
+        ProjectsCollectionView.ItemsSource = null;
+        loadedSolutionFilePath = null;
+    }
+
+    private static bool PathsEqual(string? left, string? right) =>
+        string.Equals(
+            left,
+            right,
+            OperatingSystem.IsWindows()
+                ? StringComparison.OrdinalIgnoreCase
+                : StringComparison.Ordinal);
 
     private static string GetDefaultWorkspaceRoot()
     {

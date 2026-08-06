@@ -69,6 +69,10 @@
 	</ItemGroup>
 
 	<ItemGroup>
+		<FrameworkReference Include="Microsoft.AspNetCore.App" />
+	</ItemGroup>
+
+	<ItemGroup>
 		<ProjectReference Include="..\OpenCaddis.Server\OpenCaddis.Server.csproj" />
 		<ProjectReference Include="..\OpenCaddis.Server.Builder\OpenCaddis.Server.Builder.csproj" />
 	</ItemGroup>

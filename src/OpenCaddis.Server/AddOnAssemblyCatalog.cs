@@ -9,13 +9,15 @@ internal sealed class AddOnAssemblyCatalog : IDisposable
     private readonly List<Assembly> assemblies;
     private bool disposed;
 
-    private AddOnAssemblyCatalog(AddOnLoadContext loadContext, List<Assembly> assemblies)
+    private AddOnAssemblyCatalog(AddOnLoadContext? loadContext, List<Assembly> assemblies)
     {
         this.loadContext = loadContext;
         this.assemblies = assemblies;
     }
 
     public IReadOnlyList<Assembly> Assemblies => assemblies;
+
+    public static AddOnAssemblyCatalog Empty() => new(null, []);
 
     public static AddOnAssemblyCatalog Load(string addOnPath)
     {
@@ -131,6 +133,7 @@ internal sealed class AddOnAssemblyCatalog : IDisposable
         if (name is null ||
             !(name.Equals("OpenCaddis.Server", StringComparison.OrdinalIgnoreCase) ||
               name.StartsWith("FabrCore.", StringComparison.OrdinalIgnoreCase) ||
+              name.StartsWith("Orleans.", StringComparison.OrdinalIgnoreCase) ||
               name.StartsWith("Microsoft.", StringComparison.OrdinalIgnoreCase) ||
               name.StartsWith("System.", StringComparison.OrdinalIgnoreCase) ||
               name.Equals("netstandard", StringComparison.OrdinalIgnoreCase)))
@@ -138,8 +141,25 @@ internal sealed class AddOnAssemblyCatalog : IDisposable
             return null;
         }
 
-        return AssemblyLoadContext.Default.Assemblies.FirstOrDefault(
+        var loaded = AssemblyLoadContext.Default.Assemblies.FirstOrDefault(
             candidate => AssemblyName.ReferenceMatchesDefinition(candidate.GetName(), assemblyName));
+        if (loaded is not null)
+        {
+            return loaded;
+        }
+
+        try
+        {
+            // Add-ons compiled against FabrCore.Sdk carry Orleans source-generator metadata.
+            // Resolve all host-owned dependencies explicitly through the default context even
+            // when startup has not loaded that particular assembly yet.
+            return AssemblyLoadContext.Default.LoadFromAssemblyName(assemblyName);
+        }
+        catch (Exception exception) when (
+            exception is FileNotFoundException or FileLoadException or BadImageFormatException)
+        {
+            return null;
+        }
     }
 
     private sealed class AddOnLoadContext : AssemblyLoadContext

@@ -20,11 +20,17 @@ public sealed class OpenCaddisServerBuilderHost : IOpenCaddisServerHost
 
     public IReadOnlyList<Assembly> AdditionalAssemblies => host.AdditionalAssemblies;
 
-    public static OpenCaddisServerBuilderHost Create(Uri baseUri, string addOnPath)
+    public static OpenCaddisServerBuilderHost Create(
+        Uri baseUri,
+        string addOnPath,
+        OpenCaddisCloudServerConnection cloudServer)
     {
+        ArgumentNullException.ThrowIfNull(cloudServer);
         var options = new OpenCaddisServerHostOptions
         {
-            DisplayName = "OpenCaddis Server Builder"
+            DisplayName = "OpenCaddis Server Builder",
+            CloudServer = cloudServer,
+            LoadAssembliesFromAddOnPath = false
         };
 
         // Builder-owned agents and tools can be added to this assembly later. Registering

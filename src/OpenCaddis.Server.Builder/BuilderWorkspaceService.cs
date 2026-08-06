@@ -1,5 +1,7 @@
 using System.Diagnostics;
+using System.Security.Cryptography;
 using System.Text;
+using OpenCaddis.Server.Builder.AI;
 
 namespace OpenCaddis.Server.Builder;
 
@@ -24,6 +26,48 @@ public sealed class BuilderWorkspaceService
             .ToArray();
 
         return new BuilderWorkspaceInfo(fullPath, solutionFiles);
+    }
+
+    public async Task<IReadOnlyList<BuilderProjectInfo>> GetProjectsAsync(
+        string solutionDirectory,
+        CancellationToken cancellationToken = default)
+    {
+        var workspaceInfo = Inspect(solutionDirectory);
+        if (!workspaceInfo.HasSolution)
+        {
+            throw workspaceInfo.HasMultipleSolutions
+                ? new InvalidOperationException(
+                    $"More than one solution exists in '{workspaceInfo.SolutionDirectory}'. Keep exactly one solution in the folder.")
+                : new InvalidOperationException(
+                    $"No solution exists in '{workspaceInfo.SolutionDirectory}'.");
+        }
+
+        using var workspace = RoslynWorkspaceFactory.Create();
+        var solution = await workspace.OpenSolutionAsync(
+            workspaceInfo.SolutionFilePath!,
+            cancellationToken: cancellationToken);
+
+        var pathComparer = OperatingSystem.IsWindows()
+            ? StringComparer.OrdinalIgnoreCase
+            : StringComparer.Ordinal;
+        return solution.Projects
+            .Where(project => !string.IsNullOrWhiteSpace(project.FilePath))
+            .GroupBy(project => Path.GetFullPath(project.FilePath!), pathComparer)
+            .Select(group =>
+            {
+                var project = group.First();
+                var projectFilePath = group.Key;
+                var projectName = Path.GetFileNameWithoutExtension(projectFilePath);
+                return new BuilderProjectInfo(
+                    projectName,
+                    projectFilePath,
+                    Path.GetDirectoryName(projectFilePath)!,
+                    project.Language,
+                    CreateAgentHandle(projectName, projectFilePath));
+            })
+            .OrderBy(project => project.Name, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(project => project.ProjectFilePath, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
     }
 
     public async Task<BuilderOperationResult> CreateSolutionAsync(
@@ -158,6 +202,36 @@ public sealed class BuilderWorkspaceService
         }
 
         return normalizedName;
+    }
+
+    public static string CreateAgentHandle(string projectName, string projectFilePath)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(projectName);
+        ArgumentException.ThrowIfNullOrWhiteSpace(projectFilePath);
+
+        var slug = new string(projectName
+            .ToLowerInvariant()
+            .Select(character => char.IsLetterOrDigit(character) ? character : '-')
+            .ToArray());
+        while (slug.Contains("--", StringComparison.Ordinal))
+        {
+            slug = slug.Replace("--", "-", StringComparison.Ordinal);
+        }
+
+        slug = slug.Trim('-');
+        if (slug.Length > 40)
+        {
+            slug = slug[..40].TrimEnd('-');
+        }
+
+        if (string.IsNullOrWhiteSpace(slug))
+        {
+            slug = "project";
+        }
+
+        var pathBytes = Encoding.UTF8.GetBytes(Path.GetFullPath(projectFilePath).ToUpperInvariant());
+        var pathHash = Convert.ToHexString(SHA256.HashData(pathBytes))[..8].ToLowerInvariant();
+        return $"addon-builder-{slug}-{pathHash}";
     }
 
     private static bool IsSolutionFile(string path)

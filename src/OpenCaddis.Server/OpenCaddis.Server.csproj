@@ -5,13 +5,12 @@
     <OutputType>Library</OutputType>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
-    <FabrCoreVersion>1.6.3</FabrCoreVersion>
     <AspNetCoreAssetsVersion>10.0.10</AspNetCoreAssetsVersion>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="FabrCore.Host" Version="$(FabrCoreVersion)" />
-    <PackageReference Include="FabrCore.Surface" Version="$(FabrCoreVersion)" GeneratePathProperty="true" />
+    <PackageReference Include="FabrCore.Host" Version="1.6.4-local.20260806125929" />
+    <PackageReference Include="FabrCore.Surface" Version="1.6.4-local.20260806125929" GeneratePathProperty="true" />
     <PackageReference Include="Microsoft.AspNetCore.App.Internal.Assets"
                       Version="$(AspNetCoreAssetsVersion)"
                       GeneratePathProperty="true"

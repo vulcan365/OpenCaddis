@@ -15,8 +15,14 @@ namespace OpenCaddis.App
                     fonts.AddFont("OpenSans-Semibold.ttf", "OpenSansSemibold");
                 });
 
+            builder.Services.AddSingleton(_ => new OpenCaddis.Server.OpenCaddisCloudConfigurationStore(
+                Path.Combine(FileSystem.Current.AppDataDirectory, "CloudServer")));
+            builder.Services.AddSingleton(services => OpenCaddis.Server.OpenCaddisCloudServerHost.Create(
+                new Uri("http://localhost:5082/"),
+                services.GetRequiredService<OpenCaddis.Server.OpenCaddisCloudConfigurationStore>()));
             builder.Services.AddSingleton<Services.ServerController>();
             builder.Services.AddSingleton<OpenCaddis.Server.Builder.BuilderWorkspaceService>();
+            builder.Services.AddSingleton<OpenCaddis.Server.Builder.AddonBuilderAgentProvisioner>();
             builder.Services.AddSingleton<MainPage>();
             builder.Services.AddSingleton<ServerPage>();
             builder.Services.AddSingleton<BuilderPage>();

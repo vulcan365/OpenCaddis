@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:builder="clr-namespace:OpenCaddis.Server.Builder;assembly=OpenCaddis.Server.Builder"
              x:Class="OpenCaddis.App.BuilderPage"
              Title="Builder">
     <Grid>
@@ -79,6 +80,60 @@
                                 </HorizontalStackLayout>
                             </VerticalStackLayout>
                         </Border>
+                    </VerticalStackLayout>
+                </Border>
+
+                <Border x:Name="ProjectsPanel" IsVisible="False" Padding="24">
+                    <VerticalStackLayout Spacing="14">
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                            <VerticalStackLayout Spacing="4">
+                                <Label Text="Solution projects"
+                                       FontSize="20"
+                                       FontFamily="OpenSansSemibold"
+                                       SemanticProperties.HeadingLevel="Level2" />
+                                <Label x:Name="ProjectsStatusLabel"
+                                       Text="Loading projects..."
+                                       TextColor="{AppThemeBinding Light={StaticResource Gray600}, Dark={StaticResource Gray200}}" />
+                            </VerticalStackLayout>
+                            <HorizontalStackLayout Grid.Column="1" Spacing="10" VerticalOptions="Center">
+                                <ActivityIndicator x:Name="ProjectsActivityIndicator"
+                                                   IsRunning="False"
+                                                   IsVisible="False" />
+                                <Button x:Name="RefreshProjectsButton"
+                                        Text="Refresh"
+                                        Clicked="OnRefreshProjectsClicked" />
+                            </HorizontalStackLayout>
+                        </Grid>
+
+                        <CollectionView x:Name="ProjectsCollectionView"
+                                        SelectionMode="None"
+                                        EmptyView="No loadable .NET projects were found in this solution.">
+                            <CollectionView.ItemTemplate>
+                                <DataTemplate x:DataType="builder:BuilderProjectInfo">
+                                    <Border Padding="16" Margin="0,0,0,10">
+                                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="16">
+                                            <VerticalStackLayout Spacing="3">
+                                                <Label Text="{Binding Name}"
+                                                       FontFamily="OpenSansSemibold"
+                                                       FontSize="16" />
+                                                <Label Text="{Binding ProjectFilePath}"
+                                                       FontSize="12"
+                                                       LineBreakMode="MiddleTruncation"
+                                                       TextColor="{AppThemeBinding Light={StaticResource Gray600}, Dark={StaticResource Gray200}}" />
+                                                <Label Text="{Binding AgentHandle, StringFormat='Agent: {0}'}"
+                                                       FontSize="12"
+                                                       TextColor="{AppThemeBinding Light={StaticResource Gray600}, Dark={StaticResource Gray200}}" />
+                                            </VerticalStackLayout>
+                                            <Button Grid.Column="1"
+                                                    Text="Create agent"
+                                                    VerticalOptions="Center"
+                                                    CommandParameter="{Binding .}"
+                                                    Clicked="OnCreateAgentClicked" />
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </CollectionView.ItemTemplate>
+                        </CollectionView>
                     </VerticalStackLayout>
                 </Border>
 

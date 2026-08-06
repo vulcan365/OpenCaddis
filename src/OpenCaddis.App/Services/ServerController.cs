@@ -26,11 +26,17 @@ public sealed class ServerController : IDisposable
     private const string AddOnPathPreferenceKey = "OpenCaddis.Server.AddOnPath";
     private const string ModePreferenceKey = "OpenCaddis.Server.Mode";
     private readonly SemaphoreSlim lifecycleLock = new(1, 1);
+    private readonly OpenCaddisCloudConfigurationStore cloudConfigurationStore;
+    private readonly OpenCaddisCloudServerHost cloudServer;
     private IOpenCaddisServerHost? serverHost;
     private bool disposed;
 
-    public ServerController()
+    public ServerController(
+        OpenCaddisCloudConfigurationStore cloudConfigurationStore,
+        OpenCaddisCloudServerHost cloudServer)
     {
+        this.cloudConfigurationStore = cloudConfigurationStore;
+        this.cloudServer = cloudServer;
         CurrentPort = Preferences.Default.Get(PortPreferenceKey, DefaultPort);
         var defaultAddOnPath = Path.Combine(FileSystem.Current.AppDataDirectory, "AddOns");
         CurrentAddOnPath = NormalizeAddOnPath(
@@ -60,6 +66,8 @@ public sealed class ServerController : IDisposable
 
     public Uri SurfaceUri => new(ServerUri, "surface");
 
+    public Uri CloudServerUri => cloudServer.BaseUri;
+
     public static Uri CreateServerUri(int port) => new($"http://localhost:{port}/");
 
     public static string GetModeDisplayName(OpenCaddisServerMode mode) => mode switch
@@ -68,6 +76,9 @@ public sealed class ServerController : IDisposable
         OpenCaddisServerMode.Builder => "OpenCaddis Server Builder",
         _ => throw new ArgumentOutOfRangeException(nameof(mode))
     };
+
+    public bool HasCloudConfiguration(OpenCaddisServerMode mode) =>
+        cloudConfigurationStore.IsConfigured(GetCloudTarget(mode));
 
     public async Task StartAsync(
         OpenCaddisServerMode mode,
@@ -179,15 +190,34 @@ public sealed class ServerController : IDisposable
         Preferences.Default.Set(AddOnPathPreferenceKey, CurrentAddOnPath);
         Preferences.Default.Set(ModePreferenceKey, (int)mode);
         var displayName = GetModeDisplayName(mode);
-        SetStatus(ServerState.Starting, $"Starting {displayName} and loading assemblies from {CurrentAddOnPath}...");
+        var cloudTarget = GetCloudTarget(mode);
+        if (!cloudConfigurationStore.IsConfigured(cloudTarget))
+        {
+            throw new InvalidOperationException(
+                $"Configure models and API keys for {displayName} on the Cloud configuration tab before starting it.");
+        }
+
+        SetStatus(
+            ServerState.Starting,
+            mode == OpenCaddisServerMode.Server
+                ? $"Starting {displayName} and loading assemblies from {CurrentAddOnPath}..."
+                : $"Starting {displayName}; project output will be published to {CurrentAddOnPath}...");
 
         IOpenCaddisServerHost? newHost = null;
         try
         {
+            await cloudServer.StartAsync(cancellationToken);
+            var cloudConnection = cloudServer.CreateConnection(cloudTarget);
             newHost = mode switch
             {
-                OpenCaddisServerMode.Server => OpenCaddisServerHost.Create(ServerUri, CurrentAddOnPath),
-                OpenCaddisServerMode.Builder => OpenCaddisServerBuilderHost.Create(ServerUri, CurrentAddOnPath),
+                OpenCaddisServerMode.Server => OpenCaddisServerHost.Create(
+                    ServerUri,
+                    CurrentAddOnPath,
+                    new OpenCaddisServerHostOptions { CloudServer = cloudConnection }),
+                OpenCaddisServerMode.Builder => OpenCaddisServerBuilderHost.Create(
+                    ServerUri,
+                    CurrentAddOnPath,
+                    cloudConnection),
                 _ => throw new ArgumentOutOfRangeException(nameof(mode))
             };
             await newHost.StartAsync(cancellationToken);
@@ -195,7 +225,9 @@ public sealed class ServerController : IDisposable
             LoadedAddOnAssemblyCount = newHost.AdditionalAssemblies.Count;
             SetStatus(
                 ServerState.Running,
-                $"{newHost.DisplayName} is running at {ServerUri} with {LoadedAddOnAssemblyCount} add-on assemblies.");
+                mode == OpenCaddisServerMode.Server
+                    ? $"{newHost.DisplayName} is running at {ServerUri} with {LoadedAddOnAssemblyCount} add-on assemblies."
+                    : $"{newHost.DisplayName} is running at {ServerUri}; add-on directory loading is disabled.");
         }
         catch (Exception exception)
         {
@@ -244,11 +276,18 @@ public sealed class ServerController : IDisposable
         StatusChanged?.Invoke(this, EventArgs.Empty);
     }
 
-    private static void ValidatePort(int port)
+    private void ValidatePort(int port)
     {
         if (port is < 1 or > 65535)
         {
             throw new ArgumentOutOfRangeException(nameof(port), "The port must be from 1 to 65535.");
+        }
+
+        if (port == CloudServerUri.Port)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(port),
+                $"Port {port} is reserved for the OpenCaddis.App cloud server.");
         }
     }
 
@@ -257,4 +296,11 @@ public sealed class ServerController : IDisposable
         ArgumentException.ThrowIfNullOrWhiteSpace(addOnPath);
         return Path.GetFullPath(Environment.ExpandEnvironmentVariables(addOnPath.Trim()));
     }
+
+    private static OpenCaddisCloudTarget GetCloudTarget(OpenCaddisServerMode mode) => mode switch
+    {
+        OpenCaddisServerMode.Server => OpenCaddisCloudTarget.Server,
+        OpenCaddisServerMode.Builder => OpenCaddisCloudTarget.ServerBuilder,
+        _ => throw new ArgumentOutOfRangeException(nameof(mode))
+    };
 }

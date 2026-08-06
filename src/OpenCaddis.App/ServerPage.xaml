@@ -4,107 +4,187 @@
              x:Class="OpenCaddis.App.ServerPage"
              Title="Server">
 
-    <ScrollView>
-        <VerticalStackLayout
-            Padding="48"
-            Spacing="24"
-            MaximumWidthRequest="760"
-            HorizontalOptions="Start">
+    <Grid RowDefinitions="Auto,*">
+        <HorizontalStackLayout Padding="48,24,48,0" Spacing="10">
+            <Button x:Name="HostTabButton"
+                    Text="Host"
+                    Clicked="OnHostTabClicked" />
+            <Button x:Name="ConfigurationTabButton"
+                    Text="Cloud configuration"
+                    Clicked="OnConfigurationTabClicked" />
+        </HorizontalStackLayout>
 
-            <VerticalStackLayout Spacing="6">
-                <Label
-                    Text="OpenCaddis Server"
-                    FontSize="32"
-                    FontFamily="OpenSansSemibold"
-                    SemanticProperties.HeadingLevel="Level1" />
-                <Label
-                    Text="Run either the local Server or Server Builder host."
-                    FontSize="16"
-                    TextColor="{AppThemeBinding Light={StaticResource Gray600}, Dark={StaticResource Gray200}}" />
-            </VerticalStackLayout>
+        <ScrollView Grid.Row="1" x:Name="HostTab">
+            <VerticalStackLayout
+                Padding="48,24,48,48"
+                Spacing="24"
+                MaximumWidthRequest="760"
+                HorizontalOptions="Start">
 
-            <Border Padding="24">
-                <VerticalStackLayout Spacing="18">
-                    <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
-                        <BoxView
-                            x:Name="StatusIndicator"
-                            WidthRequest="12"
-                            HeightRequest="12"
-                            CornerRadius="6"
-                            Color="{StaticResource Gray400}"
-                            VerticalOptions="Center" />
-                        <VerticalStackLayout Grid.Column="1" Spacing="2">
+                <VerticalStackLayout Spacing="6">
+                    <Label
+                        Text="OpenCaddis Server"
+                        FontSize="32"
+                        FontFamily="OpenSansSemibold"
+                        SemanticProperties.HeadingLevel="Level1" />
+                    <Label
+                        Text="Run either the local Server or Server Builder host. Both download their FabrCore configuration from this app."
+                        FontSize="16"
+                        TextColor="{AppThemeBinding Light={StaticResource Gray600}, Dark={StaticResource Gray200}}" />
+                </VerticalStackLayout>
+
+                <Border Padding="24">
+                    <VerticalStackLayout Spacing="18">
+                        <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
+                            <BoxView
+                                x:Name="StatusIndicator"
+                                WidthRequest="12"
+                                HeightRequest="12"
+                                CornerRadius="6"
+                                Color="{StaticResource Gray400}"
+                                VerticalOptions="Center" />
+                            <VerticalStackLayout Grid.Column="1" Spacing="2">
+                                <Label
+                                    x:Name="StatusLabel"
+                                    Text="Stopped"
+                                    FontFamily="OpenSansSemibold"
+                                    FontSize="18" />
+                                <Label
+                                    x:Name="StatusMessageLabel"
+                                    Text="The server is not running."
+                                    LineBreakMode="WordWrap"
+                                    TextColor="{AppThemeBinding Light={StaticResource Gray600}, Dark={StaticResource Gray200}}" />
+                            </VerticalStackLayout>
+                        </Grid>
+
+                        <BoxView HeightRequest="1" Color="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray600}}" />
+
+                        <VerticalStackLayout Spacing="8">
+                            <Label Text="Mode" FontFamily="OpenSansSemibold" />
+                            <Picker
+                                x:Name="ModePicker"
+                                WidthRequest="280"
+                                HorizontalOptions="Start"
+                                SelectedIndexChanged="OnModeSelectionChanged"
+                                SemanticProperties.Description="OpenCaddis server mode">
+                                <Picker.Items>
+                                    <x:String>Server</x:String>
+                                    <x:String>Server Builder</x:String>
+                                </Picker.Items>
+                            </Picker>
                             <Label
-                                x:Name="StatusLabel"
-                                Text="Stopped"
+                                x:Name="ModeDescriptionLabel"
+                                FontSize="12"
+                                TextColor="{AppThemeBinding Light={StaticResource Gray600}, Dark={StaticResource Gray200}}" />
+                            <Label
+                                x:Name="ModeConfigurationLabel"
+                                FontSize="12"
+                                FontFamily="OpenSansSemibold" />
+                        </VerticalStackLayout>
+
+                        <VerticalStackLayout Spacing="8">
+                            <Label Text="Local port" FontFamily="OpenSansSemibold" />
+                            <Entry
+                                x:Name="PortEntry"
+                                WidthRequest="180"
+                                HorizontalOptions="Start"
+                                Keyboard="Numeric"
+                                MaxLength="5"
+                                TextChanged="OnPortTextChanged"
+                                SemanticProperties.Description="Local server port" />
+                            <Label
+                                x:Name="UrlLabel"
                                 FontFamily="OpenSansSemibold"
-                                FontSize="18" />
+                                TextColor="{StaticResource Primary}" />
+                        </VerticalStackLayout>
+
+                        <VerticalStackLayout Spacing="8">
+                            <Label Text="Compiled assemblies path" FontFamily="OpenSansSemibold" />
+                            <Entry
+                                x:Name="AddOnPathEntry"
+                                HorizontalOptions="Fill"
+                                ClearButtonVisibility="WhileEditing"
+                                SemanticProperties.Description="Directory containing compiled OpenCaddis assemblies" />
                             <Label
-                                x:Name="StatusMessageLabel"
-                                Text="The server is not running."
-                                LineBreakMode="WordWrap"
+                                Text="Both modes depend on this path. Server loads its managed DLLs; Builder compiles projects into it."
+                                FontSize="12"
                                 TextColor="{AppThemeBinding Light={StaticResource Gray600}, Dark={StaticResource Gray200}}" />
                         </VerticalStackLayout>
-                    </Grid>
 
-                    <BoxView HeightRequest="1" Color="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray600}}" />
-
-                    <VerticalStackLayout Spacing="8">
-                        <Label Text="Mode" FontFamily="OpenSansSemibold" />
-                        <Picker
-                            x:Name="ModePicker"
-                            WidthRequest="280"
-                            HorizontalOptions="Start"
-                            SelectedIndexChanged="OnModeSelectionChanged"
-                            SemanticProperties.Description="OpenCaddis server mode">
-                            <Picker.Items>
-                                <x:String>Server</x:String>
-                                <x:String>Server Builder</x:String>
-                            </Picker.Items>
-                        </Picker>
-                        <Label
-                            x:Name="ModeDescriptionLabel"
-                            FontSize="12"
-                            TextColor="{AppThemeBinding Light={StaticResource Gray600}, Dark={StaticResource Gray200}}" />
+                        <HorizontalStackLayout Spacing="12">
+                            <Button x:Name="StartButton" Text="Start" Clicked="OnStartClicked" />
+                            <Button x:Name="StopButton" Text="Stop" Clicked="OnStopClicked" />
+                            <Button x:Name="RestartButton" Text="Restart" Clicked="OnRestartClicked" />
+                            <Button x:Name="OpenButton" Text="Open in browser" Clicked="OnOpenClicked" />
+                        </HorizontalStackLayout>
                     </VerticalStackLayout>
+                </Border>
+            </VerticalStackLayout>
+        </ScrollView>
 
-                    <VerticalStackLayout Spacing="8">
-                        <Label Text="Local port" FontFamily="OpenSansSemibold" />
-                        <Entry
-                            x:Name="PortEntry"
-                            WidthRequest="180"
-                            HorizontalOptions="Start"
-                            Keyboard="Numeric"
-                            MaxLength="5"
-                            TextChanged="OnPortTextChanged"
-                            SemanticProperties.Description="Local server port" />
-                        <Label
-                            x:Name="UrlLabel"
-                            FontFamily="OpenSansSemibold"
-                            TextColor="{StaticResource Primary}" />
-                    </VerticalStackLayout>
+        <ScrollView Grid.Row="1" x:Name="ConfigurationTab" IsVisible="False">
+            <VerticalStackLayout
+                Padding="48,24,48,48"
+                Spacing="24"
+                MaximumWidthRequest="860"
+                HorizontalOptions="Start">
 
-                    <VerticalStackLayout Spacing="8">
-                        <Label Text="Compiled assemblies path" FontFamily="OpenSansSemibold" />
-                        <Entry
-                            x:Name="AddOnPathEntry"
-                            HorizontalOptions="Fill"
-                            ClearButtonVisibility="WhileEditing"
-                            SemanticProperties.Description="Directory containing compiled OpenCaddis assemblies" />
-                        <Label
-                            Text="Both modes depend on this path. Server loads its managed DLLs; Builder will later compile projects into it."
-                            FontSize="12"
-                            TextColor="{AppThemeBinding Light={StaticResource Gray600}, Dark={StaticResource Gray200}}" />
-                    </VerticalStackLayout>
-
-                    <HorizontalStackLayout Spacing="12">
-                        <Button x:Name="StartButton" Text="Start" Clicked="OnStartClicked" />
-                        <Button x:Name="StopButton" Text="Stop" Clicked="OnStopClicked" />
-                        <Button x:Name="RestartButton" Text="Restart" Clicked="OnRestartClicked" />
-                        <Button x:Name="OpenButton" Text="Open in browser" Clicked="OnOpenClicked" />
-                    </HorizontalStackLayout>
+                <VerticalStackLayout Spacing="6">
+                    <Label Text="Cloud configuration"
+                           FontSize="32"
+                           FontFamily="OpenSansSemibold"
+                           SemanticProperties.HeadingLevel="Level1" />
+                    <Label Text="OpenCaddis.App serves these persistent model and API-key settings through the FabrCore Cloud Server protocol."
+                           FontSize="16"
+                           TextColor="{AppThemeBinding Light={StaticResource Gray600}, Dark={StaticResource Gray200}}" />
                 </VerticalStackLayout>
-            </Border>
-        </VerticalStackLayout>
-    </ScrollView>
+
+                <Border Padding="24">
+                    <VerticalStackLayout Spacing="16">
+                        <VerticalStackLayout Spacing="8">
+                            <Label Text="Configuration for" FontFamily="OpenSansSemibold" />
+                            <Picker x:Name="ConfigurationTargetPicker"
+                                    WidthRequest="280"
+                                    HorizontalOptions="Start"
+                                    SelectedIndexChanged="OnConfigurationTargetChanged">
+                                <Picker.Items>
+                                    <x:String>Server</x:String>
+                                    <x:String>Server Builder</x:String>
+                                </Picker.Items>
+                            </Picker>
+                        </VerticalStackLayout>
+
+                        <Label x:Name="CloudServerUrlLabel"
+                               FontSize="12"
+                               TextColor="{AppThemeBinding Light={StaticResource Gray600}, Dark={StaticResource Gray200}}" />
+
+                        <Label x:Name="ConfigurationStatusLabel"
+                               FontFamily="OpenSansSemibold"
+                               LineBreakMode="WordWrap" />
+
+                        <VerticalStackLayout Spacing="8">
+                            <Label Text="fabrcore.json — models and API keys"
+                                   FontFamily="OpenSansSemibold" />
+                            <Editor x:Name="ConfigurationEditor"
+                                    HeightRequest="430"
+                                    AutoSize="Disabled"
+                                    FontSize="13"
+                                    SemanticProperties.Description="FabrCore model and API-key configuration JSON" />
+                            <Label Text="The file is stored as plaintext in the app-data CloudServer folder and remains available after app restarts."
+                                   FontSize="12"
+                                   TextColor="{AppThemeBinding Light={StaticResource Gray600}, Dark={StaticResource Gray200}}" />
+                        </VerticalStackLayout>
+
+                        <HorizontalStackLayout Spacing="12">
+                            <Button x:Name="SaveConfigurationButton"
+                                    Text="Save configuration"
+                                    Clicked="OnSaveConfigurationClicked" />
+                            <Button Text="Reload"
+                                    Clicked="OnReloadConfigurationClicked" />
+                        </HorizontalStackLayout>
+                    </VerticalStackLayout>
+                </Border>
+            </VerticalStackLayout>
+        </ScrollView>
+    </Grid>
 </ContentPage>

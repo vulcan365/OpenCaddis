@@ -65,9 +65,23 @@ public sealed class OpenCaddisServerHost : IOpenCaddisServerHost
         ArgumentException.ThrowIfNullOrWhiteSpace(addOnPath);
         options ??= new OpenCaddisServerHostOptions();
         ArgumentException.ThrowIfNullOrWhiteSpace(options.DisplayName);
+        var cloudServer = options.CloudServer ?? throw new InvalidOperationException(
+            "OpenCaddis Server requires an OpenCaddis.App cloud-server connection.");
+        if (!cloudServer.CloudServerUri.IsAbsoluteUri ||
+            cloudServer.CloudServerUri.Scheme != Uri.UriSchemeHttp ||
+            !cloudServer.CloudServerUri.IsLoopback)
+        {
+            throw new InvalidOperationException(
+                "The OpenCaddis cloud-server connection must use an absolute loopback HTTP URL.");
+        }
+        ArgumentException.ThrowIfNullOrWhiteSpace(cloudServer.ApiKey);
+        ArgumentException.ThrowIfNullOrWhiteSpace(cloudServer.ClusterId);
         var displayName = options.DisplayName.Trim();
         var fullAddOnPath = Path.GetFullPath(addOnPath);
-        var addOnCatalog = AddOnAssemblyCatalog.Load(fullAddOnPath);
+        var addOnCatalog = options.LoadAssembliesFromAddOnPath
+            ? AddOnAssemblyCatalog.Load(fullAddOnPath)
+            : AddOnAssemblyCatalog.Empty();
+        var hostApiBaseUrl = baseUri.AbsoluteUri.TrimEnd('/');
 
         try
         {
@@ -83,7 +97,19 @@ public sealed class OpenCaddisServerHost : IOpenCaddisServerHost
 
             // FabrCore's advertised URL is separate from Kestrel's listen URL. Keeping
             // both aligned here makes this host ready for FabrCore server registration.
-            builder.Configuration["FabrCore:HostUrl"] = baseUri.ToString();
+            builder.Configuration["FabrCore:HostUrl"] = hostApiBaseUrl;
+            builder.Configuration["FabrCore:CloudServer:Enabled"] = "true";
+            builder.Configuration["FabrCore:CloudServer:Url"] =
+                cloudServer.CloudServerUri.AbsoluteUri.TrimEnd('/');
+            builder.Configuration["FabrCore:CloudServer:ApiKey"] = cloudServer.ApiKey;
+            builder.Configuration["FabrCore:CloudServer:ClusterId"] = cloudServer.ClusterId;
+            builder.Configuration["FabrCore:CloudServer:Environment"] = "Production";
+            builder.Configuration["FabrCore:CloudServer:RefreshInterval"] = "00:00:05";
+            builder.Configuration["FabrCore:CloudServer:RequestTimeout"] = "00:00:10";
+            builder.Configuration["FabrCore:CloudServer:CacheLastKnownGood"] = "false";
+            builder.Configuration["FabrCore:CloudServer:StartupFailureBehavior"] = "Fail";
+            builder.Configuration["FabrCore:CloudServer:Heartbeat:Enabled"] = "true";
+            builder.Configuration["FabrCore:CloudServer:Heartbeat:Interval"] = "00:00:10";
 
             builder.Services.AddRazorComponents()
                 .AddInteractiveServerComponents();
@@ -101,7 +127,10 @@ public sealed class OpenCaddisServerHost : IOpenCaddisServerHost
                 }
             }
 
-            additionalAssemblies.AddRange(addOnCatalog.Assemblies);
+            // FabrCore's registry discovers already-loaded agent/plugin assemblies from the
+            // AppDomain. Do not also pass collectible add-ons to FabrCore's Orleans assembly
+            // list: FabrCore reloads every entry by simple name in the default context, which
+            // cannot resolve (or reference) an assembly from a collectible context.
 
             builder.AddFabrCoreServer(new FabrCoreServerOptions
             {
@@ -113,7 +142,7 @@ public sealed class OpenCaddisServerHost : IOpenCaddisServerHost
             builder.Services.AddFabrCoreSurfaceComponents();
             builder.Services.Configure<SurfaceOptions>(options =>
             {
-                options.FabrCoreHostUrl = baseUri.ToString();
+                options.FabrCoreHostUrl = hostApiBaseUrl;
                 options.DevelopmentFallbackPrincipalId = "local-user";
                 options.EnableAgentDirectory = true;
                 options.EnableAgentChat = true;
