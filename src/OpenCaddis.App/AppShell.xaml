@@ -26,6 +26,15 @@
     </FlyoutItem>
 
     <FlyoutItem
+        Title="Builder"
+        Route="builder">
+        <ShellContent
+            x:Name="BuilderContent"
+            Title="Builder"
+            Route="builder-page" />
+    </FlyoutItem>
+
+    <FlyoutItem
         Title="Surface"
         Route="surface">
         <ShellContent
