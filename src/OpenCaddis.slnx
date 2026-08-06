@@ -1,0 +1,7 @@
+<Solution>
+  <Project Path="OpenCaddis.App/OpenCaddis.App.csproj" Id="1e60da05-33df-408b-b72a-a7e9517ddf2a">
+    <Deploy Solution="Debug|*" />
+  </Project>
+  <Project Path="OpenCaddis.Server/OpenCaddis.Server.csproj" Id="edf0481b-75aa-4764-a3e7-e54326ad3ff8" />
+  <Project Path="OpenCaddis.Server.Tests/OpenCaddis.Server.Tests.csproj" />
+</Solution>

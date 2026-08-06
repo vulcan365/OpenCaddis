@@ -5,3 +5,7 @@
 /.agents/skills
 /.claude/skills
 /src/.vs
+**/bin/
+**/obj/
+**/TestResults/
+*.user
