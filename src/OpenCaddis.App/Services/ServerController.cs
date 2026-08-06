@@ -68,6 +68,8 @@ public sealed class ServerController : IDisposable
 
     public Uri CloudServerUri => cloudServer.BaseUri;
 
+    internal string CurrentAdminApiKey { get; private set; } = string.Empty;
+
     public static Uri CreateServerUri(int port) => new($"http://localhost:{port}/");
 
     public static string GetModeDisplayName(OpenCaddisServerMode mode) => mode switch
@@ -208,6 +210,7 @@ public sealed class ServerController : IDisposable
         {
             await cloudServer.StartAsync(cancellationToken);
             var cloudConnection = cloudServer.CreateConnection(cloudTarget);
+            CurrentAdminApiKey = cloudConnection.ApiKey;
             newHost = mode switch
             {
                 OpenCaddisServerMode.Server => OpenCaddisServerHost.Create(
@@ -236,6 +239,7 @@ public sealed class ServerController : IDisposable
                 await newHost.DisposeAsync();
             }
 
+            CurrentAdminApiKey = string.Empty;
             SetStatus(ServerState.Failed, exception.Message);
             throw;
         }
@@ -247,6 +251,7 @@ public sealed class ServerController : IDisposable
         serverHost = null;
         if (host is null)
         {
+            CurrentAdminApiKey = string.Empty;
             SetStatus(ServerState.Stopped, "No OpenCaddis server mode is running.");
             return;
         }
@@ -265,6 +270,7 @@ public sealed class ServerController : IDisposable
         finally
         {
             await host.DisposeAsync();
+            CurrentAdminApiKey = string.Empty;
             LoadedAddOnAssemblyCount = 0;
         }
     }

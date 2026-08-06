@@ -5,6 +5,7 @@ using FabrCore.Surface.Services;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using System.Net.Http.Headers;
 
 namespace OpenCaddis.Server.Builder;
 
@@ -19,18 +20,18 @@ public sealed class AddonBuilderAgentProvisioner
 
     public async Task<AgentHealthStatus> CreateAgentAsync(
         Uri hostUri,
+        string adminApiKey,
         BuilderProjectInfo project,
         string solutionFilePath,
         string outputPath,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(hostUri);
-        var agentConfiguration = AddonBuilderAgentDefinition.CreateConfiguration(
-            project,
-            solutionFilePath,
-            outputPath);
+        ArgumentException.ThrowIfNullOrWhiteSpace(adminApiKey);
 
         using var httpClient = new HttpClient();
+        httpClient.DefaultRequestHeaders.Authorization =
+            new AuthenticationHeaderValue("Bearer", adminApiKey.Trim());
         var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
             {
@@ -41,6 +42,15 @@ public sealed class AddonBuilderAgentProvisioner
             httpClient,
             configuration,
             loggerFactory.CreateLogger<FabrCoreHostApiClient>());
+        var skillReferences = await AddonBuilderSkillPackages.PublishAsync(
+            apiClient,
+            AddonBuilderAgentDefinition.DefaultPrincipalHandle,
+            cancellationToken);
+        var agentConfiguration = AddonBuilderAgentDefinition.CreateConfiguration(
+            project,
+            solutionFilePath,
+            outputPath,
+            harnessSkills: skillReferences);
         var result = await apiClient.CreateAgentsAsync(
             [agentConfiguration],
             HealthDetailLevel.Detailed,

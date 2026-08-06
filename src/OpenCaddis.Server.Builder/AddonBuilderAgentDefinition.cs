@@ -1,4 +1,5 @@
 using FabrCore.Core;
+using FabrCore.Sdk;
 using OpenCaddis.Server.Builder.AI.Agents;
 using OpenCaddis.Server.Builder.AI.Plugins;
 
@@ -13,7 +14,8 @@ public static class AddonBuilderAgentDefinition
         string solutionFilePath,
         string outputPath,
         string principalHandle = DefaultPrincipalHandle,
-        string modelName = "default")
+        string modelName = "default",
+        IReadOnlyCollection<string>? harnessSkills = null)
     {
         ArgumentNullException.ThrowIfNull(project);
         ArgumentException.ThrowIfNullOrWhiteSpace(solutionFilePath);
@@ -32,6 +34,12 @@ public static class AddonBuilderAgentDefinition
         if (!File.Exists(fullSolutionPath))
         {
             throw new FileNotFoundException("The solution file does not exist.", fullSolutionPath);
+        }
+
+        var skillReferences = harnessSkills ?? AddonBuilderSkillPackages.References;
+        if (skillReferences.Count == 0)
+        {
+            throw new ArgumentException("At least one FabrCore Harness Skill is required.", nameof(harnessSkills));
         }
 
         return new AgentConfiguration
@@ -53,9 +61,11 @@ public static class AddonBuilderAgentDefinition
                 [$"{ProjectFilesystemPlugin.Alias}:ProjectPath"] = fullProjectPath,
                 [$"{DotNetCliPlugin.Alias}:ProjectPath"] = fullProjectPath,
                 [$"{DotNetCliPlugin.Alias}:SolutionPath"] = fullSolutionPath,
-                [$"{DotNetCliPlugin.Alias}:OutputPath"] = fullOutputPath
+                [$"{DotNetCliPlugin.Alias}:OutputPath"] = fullOutputPath,
+                [HarnessArgs.Skills] = string.Join(',', skillReferences),
+                [HarnessArgs.Loop] = "todo"
             },
-            ForceReconfigure = false
+            ForceReconfigure = true
         };
     }
 

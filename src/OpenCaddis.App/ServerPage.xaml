@@ -12,6 +12,10 @@
             <Button x:Name="ConfigurationTabButton"
                     Text="Cloud configuration"
                     Clicked="OnConfigurationTabClicked" />
+            <Button x:Name="AgentsTabButton"
+                    Text="Agents"
+                    IsVisible="False"
+                    Clicked="OnAgentsTabClicked" />
         </HorizontalStackLayout>
 
         <ScrollView Grid.Row="1" x:Name="HostTab">
@@ -182,6 +186,217 @@
                             <Button Text="Reload"
                                     Clicked="OnReloadConfigurationClicked" />
                         </HorizontalStackLayout>
+                    </VerticalStackLayout>
+                </Border>
+            </VerticalStackLayout>
+        </ScrollView>
+
+        <ScrollView Grid.Row="1" x:Name="AgentsTab" IsVisible="False">
+            <VerticalStackLayout
+                Padding="48,24,48,48"
+                Spacing="24"
+                MaximumWidthRequest="960"
+                HorizontalOptions="Start">
+
+                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="16">
+                    <VerticalStackLayout Spacing="6">
+                        <Label Text="Create a FabrCore agent"
+                               FontSize="32"
+                               FontFamily="OpenSansSemibold"
+                               SemanticProperties.HeadingLevel="Level1" />
+                        <Label Text="Choose from the agents, plugins, and tools registered by the running server."
+                               FontSize="16"
+                               TextColor="{AppThemeBinding Light={StaticResource Gray600}, Dark={StaticResource Gray200}}" />
+                    </VerticalStackLayout>
+                    <HorizontalStackLayout Grid.Column="1" Spacing="10" VerticalOptions="Center">
+                        <ActivityIndicator x:Name="RegistryActivityIndicator"
+                                           IsVisible="False"
+                                           IsRunning="False" />
+                        <Button x:Name="RefreshRegistryButton"
+                                Text="Refresh registry"
+                                Clicked="OnRefreshRegistryClicked" />
+                    </HorizontalStackLayout>
+                </Grid>
+
+                <Label x:Name="RegistryStatusLabel"
+                       Text="Open this tab to load the FabrCore registry."
+                       LineBreakMode="WordWrap"
+                       TextColor="{AppThemeBinding Light={StaticResource Gray600}, Dark={StaticResource Gray200}}" />
+                <Label x:Name="RegistryCollisionLabel"
+                       IsVisible="False"
+                       LineBreakMode="WordWrap"
+                       TextColor="OrangeRed" />
+
+                <Border Padding="24">
+                    <VerticalStackLayout Spacing="18">
+                        <Label Text="Agent configuration"
+                               FontSize="20"
+                               FontFamily="OpenSansSemibold"
+                               SemanticProperties.HeadingLevel="Level2" />
+
+                        <VerticalStackLayout Spacing="8">
+                            <Label Text="Agent type" FontFamily="OpenSansSemibold" />
+                            <Picker x:Name="AgentTypePicker"
+                                    Title="Select a registered agent type"
+                                    ItemDisplayBinding="{Binding Alias}"
+                                    SelectedIndexChanged="OnAgentTypeSelectionChanged" />
+                        </VerticalStackLayout>
+
+                        <Border x:Name="AgentTypeDetails"
+                                IsVisible="False"
+                                Padding="16"
+                                BackgroundColor="{AppThemeBinding Light={StaticResource Gray100}, Dark={StaticResource Gray900}}">
+                            <VerticalStackLayout Spacing="5">
+                                <Label x:Name="AgentTypeNameLabel"
+                                       FontFamily="OpenSansSemibold"
+                                       LineBreakMode="WordWrap" />
+                                <Label x:Name="AgentTypeDescriptionLabel"
+                                       LineBreakMode="WordWrap" />
+                                <Label x:Name="AgentTypeCapabilitiesLabel"
+                                       FontSize="12"
+                                       LineBreakMode="WordWrap"
+                                       TextColor="{AppThemeBinding Light={StaticResource Gray600}, Dark={StaticResource Gray200}}" />
+                                <Label x:Name="AgentTypeNotesLabel"
+                                       FontSize="12"
+                                       LineBreakMode="WordWrap"
+                                       TextColor="{AppThemeBinding Light={StaticResource Gray600}, Dark={StaticResource Gray200}}" />
+                            </VerticalStackLayout>
+                        </Border>
+
+                        <Grid ColumnDefinitions="*,*" ColumnSpacing="16">
+                            <VerticalStackLayout Spacing="8">
+                                <Label Text="Principal handle" FontFamily="OpenSansSemibold" />
+                                <Entry x:Name="AgentPrincipalEntry"
+                                       Text="local-user"
+                                       Placeholder="local-user"
+                                       ClearButtonVisibility="WhileEditing" />
+                            </VerticalStackLayout>
+                            <VerticalStackLayout Grid.Column="1" Spacing="8">
+                                <Label Text="Agent handle" FontFamily="OpenSansSemibold" />
+                                <Entry x:Name="AgentHandleEntry"
+                                       Placeholder="Example: research-assistant"
+                                       ClearButtonVisibility="WhileEditing" />
+                                <Label Text="Use a bare handle; the principal prefix is added automatically."
+                                       FontSize="12"
+                                       TextColor="{AppThemeBinding Light={StaticResource Gray600}, Dark={StaticResource Gray200}}" />
+                            </VerticalStackLayout>
+                        </Grid>
+
+                        <Grid ColumnDefinitions="220,*" ColumnSpacing="16">
+                            <VerticalStackLayout Spacing="8">
+                                <Label Text="Model configuration" FontFamily="OpenSansSemibold" />
+                                <Entry x:Name="AgentModelEntry"
+                                       Text="default"
+                                       Placeholder="default"
+                                       ClearButtonVisibility="WhileEditing" />
+                            </VerticalStackLayout>
+                            <VerticalStackLayout Grid.Column="1" Spacing="8">
+                                <Label Text="Description" FontFamily="OpenSansSemibold" />
+                                <Entry x:Name="AgentDescriptionEntry"
+                                       Placeholder="Optional description"
+                                       ClearButtonVisibility="WhileEditing" />
+                            </VerticalStackLayout>
+                        </Grid>
+
+                        <VerticalStackLayout Spacing="8">
+                            <Label Text="System prompt" FontFamily="OpenSansSemibold" />
+                            <Editor x:Name="AgentSystemPromptEditor"
+                                    HeightRequest="130"
+                                    AutoSize="Disabled"
+                                    Placeholder="Optional instructions for this agent" />
+                        </VerticalStackLayout>
+
+                        <BoxView HeightRequest="1"
+                                 Color="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray600}}" />
+
+                        <VerticalStackLayout Spacing="10">
+                            <Label Text="Plugins"
+                                   FontSize="18"
+                                   FontFamily="OpenSansSemibold" />
+                            <Label Text="Select any registered plugin bundles this agent should receive."
+                                   FontSize="12"
+                                   TextColor="{AppThemeBinding Light={StaticResource Gray600}, Dark={StaticResource Gray200}}" />
+                            <VerticalStackLayout x:Name="PluginsList"
+                                                 Spacing="8"
+                                                 BindableLayout.ItemsSource="{Binding}">
+                                <BindableLayout.ItemTemplate>
+                                    <DataTemplate>
+                                        <Border Padding="12">
+                                            <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
+                                                <CheckBox IsChecked="{Binding IsSelected, Mode=TwoWay}"
+                                                          VerticalOptions="Start" />
+                                                <VerticalStackLayout Grid.Column="1" Spacing="3">
+                                                    <Label Text="{Binding Alias}"
+                                                           FontFamily="OpenSansSemibold" />
+                                                    <Label Text="{Binding DetailText}"
+                                                           FontSize="12"
+                                                           LineBreakMode="WordWrap"
+                                                           TextColor="{AppThemeBinding Light={StaticResource Gray600}, Dark={StaticResource Gray200}}" />
+                                                </VerticalStackLayout>
+                                            </Grid>
+                                        </Border>
+                                    </DataTemplate>
+                                </BindableLayout.ItemTemplate>
+                            </VerticalStackLayout>
+                        </VerticalStackLayout>
+
+                        <VerticalStackLayout Spacing="10">
+                            <Label Text="Standalone tools"
+                                   FontSize="18"
+                                   FontFamily="OpenSansSemibold" />
+                            <Label Text="Select individual registered tools to add to the agent."
+                                   FontSize="12"
+                                   TextColor="{AppThemeBinding Light={StaticResource Gray600}, Dark={StaticResource Gray200}}" />
+                            <VerticalStackLayout x:Name="ToolsList"
+                                                 Spacing="8"
+                                                 BindableLayout.ItemsSource="{Binding}">
+                                <BindableLayout.ItemTemplate>
+                                    <DataTemplate>
+                                        <Border Padding="12">
+                                            <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
+                                                <CheckBox IsChecked="{Binding IsSelected, Mode=TwoWay}"
+                                                          VerticalOptions="Start" />
+                                                <VerticalStackLayout Grid.Column="1" Spacing="3">
+                                                    <Label Text="{Binding Alias}"
+                                                           FontFamily="OpenSansSemibold" />
+                                                    <Label Text="{Binding DetailText}"
+                                                           FontSize="12"
+                                                           LineBreakMode="WordWrap"
+                                                           TextColor="{AppThemeBinding Light={StaticResource Gray600}, Dark={StaticResource Gray200}}" />
+                                                </VerticalStackLayout>
+                                            </Grid>
+                                        </Border>
+                                    </DataTemplate>
+                                </BindableLayout.ItemTemplate>
+                            </VerticalStackLayout>
+                        </VerticalStackLayout>
+
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="16">
+                            <VerticalStackLayout Spacing="3">
+                                <Label Text="Show in Surface"
+                                       FontFamily="OpenSansSemibold" />
+                                <Label Text="Add the created agent to this principal's Surface agent list."
+                                       FontSize="12"
+                                       TextColor="{AppThemeBinding Light={StaticResource Gray600}, Dark={StaticResource Gray200}}" />
+                            </VerticalStackLayout>
+                            <Switch x:Name="AddAgentToSurfaceSwitch"
+                                    Grid.Column="1"
+                                    IsToggled="True"
+                                    VerticalOptions="Center" />
+                        </Grid>
+
+                        <HorizontalStackLayout Spacing="12">
+                            <Button x:Name="CreateAgentButton"
+                                    Text="Create agent"
+                                    IsEnabled="False"
+                                    Clicked="OnCreateAgentClicked" />
+                            <ActivityIndicator x:Name="CreateAgentActivityIndicator"
+                                               IsVisible="False"
+                                               IsRunning="False"
+                                               VerticalOptions="Center" />
+                        </HorizontalStackLayout>
+                        <Label x:Name="AgentCreationStatusLabel"
+                               LineBreakMode="WordWrap" />
                     </VerticalStackLayout>
                 </Border>
             </VerticalStackLayout>

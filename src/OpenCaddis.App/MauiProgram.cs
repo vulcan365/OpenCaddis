@@ -21,6 +21,8 @@ namespace OpenCaddis.App
                 new Uri("http://localhost:5082/"),
                 services.GetRequiredService<OpenCaddis.Server.OpenCaddisCloudConfigurationStore>()));
             builder.Services.AddSingleton<Services.ServerController>();
+            builder.Services.AddSingleton<HttpClient>();
+            builder.Services.AddSingleton<OpenCaddis.Server.OpenCaddisAgentRegistryService>();
             builder.Services.AddSingleton<OpenCaddis.Server.Builder.BuilderWorkspaceService>();
             builder.Services.AddSingleton<OpenCaddis.Server.Builder.AddonBuilderAgentProvisioner>();
             builder.Services.AddSingleton<MainPage>();

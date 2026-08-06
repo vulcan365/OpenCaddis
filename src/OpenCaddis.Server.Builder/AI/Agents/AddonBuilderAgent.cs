@@ -13,8 +13,7 @@ namespace OpenCaddis.Server.Builder.AI.Agents;
 public sealed class AddonBuilderAgent : FabrCoreAgentProxy
 {
     public const string Alias = "addon-builder-agent";
-    private AIAgent? agent;
-    private AgentSession? session;
+    private FabrCoreHarnessResult? harness;
 
     public AddonBuilderAgent(
         AgentConfiguration config,
@@ -27,30 +26,41 @@ public sealed class AddonBuilderAgent : FabrCoreAgentProxy
     public override async Task OnInitialize()
     {
         var tools = await ResolveConfiguredToolsAsync();
-        var result = await CreateChatClientAgent(
+        harness = await CreateFabrCoreHarnessAgent(
             config.Models ?? "default",
             config.Handle ?? fabrcoreAgentHost.GetHandle(),
             tools);
-        agent = result.Agent;
-        session = result.Session;
     }
 
     public override async Task<AgentMessage> OnMessage(AgentMessage message)
     {
         var response = message.Response();
-        if (agent is null || session is null)
+        if (harness is null)
         {
             response.Message = "The coding agent has not initialized successfully.";
             return response;
         }
 
-        SetStatusMessage("Inspecting project and planning changes..");
+        SetStatusMessage("Inspecting project and planning changes...");
         try
         {
             var prompt = new ChatMessage(ChatRole.User, message.Message ?? string.Empty);
-            await foreach (var update in agent.RunStreamingAsync(prompt, session))
+            await foreach (var update in harness.RunStreamingAsync([prompt]))
             {
                 response.Message += update.Text;
+            }
+
+            if (harness.DescribeLostDelegations() is { } lostDelegations)
+            {
+                response.Message += $"{Environment.NewLine}{Environment.NewLine}{lostDelegations}";
+            }
+
+            var remaining = await harness.GetRemainingTodosAsync();
+            if (remaining.Count > 0)
+            {
+                response.Message += $"{Environment.NewLine}{Environment.NewLine}" +
+                    $"Not completed within the iteration budget:{Environment.NewLine}" +
+                    string.Join(Environment.NewLine, remaining.Select(item => $"- {item.Title}"));
             }
 
             return response;

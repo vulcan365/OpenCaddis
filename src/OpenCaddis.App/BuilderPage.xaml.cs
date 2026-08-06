@@ -165,6 +165,7 @@ public partial class BuilderPage : ContentPage
         {
             var health = await agentProvisioner.CreateAgentAsync(
                 serverController.ServerUri,
+                serverController.CurrentAdminApiKey,
                 project,
                 workspace.SolutionFilePath!,
                 serverController.CurrentAddOnPath);

@@ -1,7 +1,11 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Net.Sockets;
+using FabrCore.Sdk;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging.Abstractions;
 using OpenCaddis.Server.Builder;
+using System.Net.Http.Headers;
 
 namespace OpenCaddis.Server.Tests;
 
@@ -24,13 +28,14 @@ public sealed class OpenCaddisServerBuilderHostTests
         using var client = new HttpClient { BaseAddress = baseUri };
         await using var cloud = await TestOpenCaddisCloudServer.CreateAsync(
             OpenCaddis.Server.OpenCaddisCloudTarget.ServerBuilder);
+        var cloudConnection = cloud.Connection(OpenCaddis.Server.OpenCaddisCloudTarget.ServerBuilder);
 
         try
         {
             await using var host = OpenCaddisServerBuilderHost.Create(
                 baseUri,
                 addOnPath,
-                cloud.Connection(OpenCaddis.Server.OpenCaddisCloudTarget.ServerBuilder));
+                cloudConnection);
             Assert.AreEqual("OpenCaddis Server Builder", host.DisplayName);
             Assert.AreEqual(Path.GetFullPath(addOnPath), host.AddOnPath);
             Assert.IsEmpty(
@@ -54,6 +59,21 @@ public sealed class OpenCaddisServerBuilderHostTests
             Assert.Contains("roslyn-code", discovery);
             Assert.Contains("dotnet-cli", discovery);
             Assert.Contains("project-files", discovery);
+
+            using var adminClient = CreateAdminClient(cloudConnection.ApiKey, baseUri);
+            var apiClient = new FabrCoreHostApiClient(
+                adminClient,
+                new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+                {
+                    ["FabrCore:HostUrl"] = baseUri.AbsoluteUri.TrimEnd('/')
+                }).Build(),
+                NullLogger<FabrCoreHostApiClient>.Instance);
+            var skillReferences = await AddonBuilderSkillPackages.PublishAsync(apiClient, "local-user");
+            var skillCatalog = await apiClient.ListHarnessSkillsAsync("local-user");
+            Assert.HasCount(skillReferences.Count, skillCatalog);
+            CollectionAssert.AreEquivalent(
+                skillReferences.ToArray(),
+                skillCatalog.Select(skill => skill.Reference).ToArray());
 
             using var createAgentRequest = new HttpRequestMessage(
                 HttpMethod.Post,
@@ -86,5 +106,12 @@ public sealed class OpenCaddisServerBuilderHostTests
         {
             listener.Stop();
         }
+    }
+
+    private static HttpClient CreateAdminClient(string apiKey, Uri baseUri)
+    {
+        var client = new HttpClient { BaseAddress = baseUri };
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
+        return client;
     }
 }

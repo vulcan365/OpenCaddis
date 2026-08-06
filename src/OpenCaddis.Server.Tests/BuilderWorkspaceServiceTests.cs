@@ -8,6 +8,8 @@ using FabrCore.Surface.CommandCenter;
 using System.Net;
 using System.Net.Http.Json;
 using System.Reflection;
+using System.IO.Compression;
+using FabrCore.Core.Skills;
 
 namespace OpenCaddis.Server.Tests;
 
@@ -57,6 +59,42 @@ public sealed class BuilderWorkspaceServiceTests
         Assert.AreEqual("local-user", savedRequest.Headers.GetValues("x-user-handle").Single());
         Assert.IsNotNull(savedPreferences);
         Assert.Contains(agentHandle, savedPreferences.SurfaceAgentHandles);
+    }
+
+    [TestMethod]
+    public async Task Embedded_fabrcore_skills_are_individually_published_and_pinned()
+    {
+        var packages = AddonBuilderSkillPackages.GetPackages();
+        Assert.HasCount(24, packages);
+        Assert.IsTrue(packages.All(package => package.Name.StartsWith("fabrcore", StringComparison.Ordinal)));
+        Assert.HasCount(packages.Count, packages.Select(package => package.Name).Distinct(StringComparer.Ordinal));
+
+        foreach (var package in packages)
+        {
+            Assert.HasCount(64, package.Version);
+            using var archive = new ZipArchive(package.OpenRead(), ZipArchiveMode.Read);
+            Assert.IsNotNull(archive.GetEntry("SKILL.md"), $"{package.Name} must contain SKILL.md at its root.");
+            Assert.IsTrue(archive.Entries.All(entry =>
+                entry.FullName.Split('/').Length - 1 <= FabrCoreSkillStorage.MaxResourceDepth));
+        }
+
+        var published = new List<string>();
+        var references = await AddonBuilderSkillPackages.PublishAsync(
+            (principalId, name, version, zipStream, _) =>
+            {
+                Assert.AreEqual("local-user", principalId);
+                using var archive = new ZipArchive(zipStream, ZipArchiveMode.Read, leaveOpen: true);
+                Assert.IsNotNull(archive.GetEntry("SKILL.md"));
+                published.Add($"{name}@{version}");
+                return Task.FromResult(new FabrCoreSkillPublishResult
+                {
+                    Manifest = new FabrCoreSkillManifest { Name = name, Version = version }
+                });
+            },
+            "local-user");
+
+        CollectionAssert.AreEqual(packages.Select(package => package.Reference).ToArray(), references.ToArray());
+        CollectionAssert.AreEqual(packages.Select(package => package.Reference).ToArray(), published.ToArray());
     }
 
     [TestMethod]
@@ -121,6 +159,11 @@ public sealed class BuilderWorkspaceServiceTests
             Assert.AreEqual(
                 project.ProjectFilePath,
                 agentConfiguration.Args[$"{RoslynCodeAnalysisPlugin.Alias}:ProjectPath"]);
+            Assert.AreEqual("todo", agentConfiguration.Args[HarnessArgs.Loop]);
+            CollectionAssert.AreEqual(
+                AddonBuilderSkillPackages.References.ToArray(),
+                agentConfiguration.Args[HarnessArgs.Skills].Split(','));
+            Assert.IsTrue(agentConfiguration.ForceReconfigure);
 
             await using var roslynPlugin = new RoslynCodeAnalysisPlugin();
             await roslynPlugin.InitializeAsync(

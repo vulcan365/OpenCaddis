@@ -15,6 +15,7 @@ namespace OpenCaddis.Server;
 
 public sealed class OpenCaddisServerHost : IOpenCaddisServerHost
 {
+    private const int MaxHarnessSkillUploadBytes = 4 * 1024 * 1024;
     private const string BlazorWebScriptResourceName =
         "OpenCaddis.Server.StaticAssets.blazor.web.js";
     private const string SurfaceStyleResourceName =
@@ -110,6 +111,11 @@ public sealed class OpenCaddisServerHost : IOpenCaddisServerHost
             builder.Configuration["FabrCore:CloudServer:StartupFailureBehavior"] = "Fail";
             builder.Configuration["FabrCore:CloudServer:Heartbeat:Enabled"] = "true";
             builder.Configuration["FabrCore:CloudServer:Heartbeat:Interval"] = "00:00:10";
+            // The desktop app provisions principal-scoped Harness Skills through FabrCore's
+            // protected administration API. Reuse this mode's generated loopback cloud key;
+            // it is already persisted outside the repository and never exposed over the UI.
+            builder.Configuration["FabrCore:AdminAuthentication:ApiKey"] = cloudServer.ApiKey;
+            builder.Configuration["FabrCore:AdminAuthentication:PrincipalId"] = "opencaddis-app";
 
             builder.Services.AddRazorComponents()
                 .AddInteractiveServerComponents();
@@ -154,6 +160,7 @@ public sealed class OpenCaddisServerHost : IOpenCaddisServerHost
             });
 
             var application = builder.Build();
+            UseBufferedHarnessSkillUploads(application);
             application.UseAntiforgery();
             application.UseFabrCoreServer(new FabrCoreServerOptions());
             MapEmbeddedAsset(
@@ -214,6 +221,59 @@ public sealed class OpenCaddisServerHost : IOpenCaddisServerHost
                 ?? throw new InvalidOperationException($"Embedded web asset '{resourceName}' is missing.");
 
             return Results.Stream(stream, contentType);
+        });
+    }
+
+    private static void UseBufferedHarnessSkillUploads(WebApplication application)
+    {
+        application.Use(async (context, next) =>
+        {
+            var path = context.Request.Path.Value;
+            var isSkillUpload = HttpMethods.IsPut(context.Request.Method) &&
+                path is not null &&
+                path.StartsWith(
+                    "/fabrcoreapi/admin/v1/principals/",
+                    StringComparison.OrdinalIgnoreCase) &&
+                path.Contains("/skills/", StringComparison.OrdinalIgnoreCase);
+            if (!isSkillUpload)
+            {
+                await next();
+                return;
+            }
+
+            // FabrCore's ZIP reader requires a seekable stream and currently opens the
+            // request synchronously. Buffer this one protected upload route asynchronously
+            // instead of enabling synchronous Kestrel I/O for the whole application.
+            var originalBody = context.Request.Body;
+            await using var bufferedBody = new MemoryStream();
+            var buffer = new byte[81920];
+            while (true)
+            {
+                var read = await originalBody.ReadAsync(buffer, context.RequestAborted);
+                if (read == 0)
+                {
+                    break;
+                }
+
+                if (bufferedBody.Length + read > MaxHarnessSkillUploadBytes)
+                {
+                    context.Response.StatusCode = StatusCodes.Status413PayloadTooLarge;
+                    return;
+                }
+
+                await bufferedBody.WriteAsync(buffer.AsMemory(0, read), context.RequestAborted);
+            }
+
+            bufferedBody.Position = 0;
+            context.Request.Body = bufferedBody;
+            try
+            {
+                await next();
+            }
+            finally
+            {
+                context.Request.Body = originalBody;
+            }
         });
     }
 
