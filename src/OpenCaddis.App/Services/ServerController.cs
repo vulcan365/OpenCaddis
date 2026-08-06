@@ -1,7 +1,14 @@
 using Microsoft.Maui.Storage;
 using OpenCaddis.Server;
+using OpenCaddis.Server.Builder;
 
 namespace OpenCaddis.App.Services;
+
+public enum OpenCaddisServerMode
+{
+    Server,
+    Builder
+}
 
 public enum ServerState
 {
@@ -17,8 +24,9 @@ public sealed class ServerController : IDisposable
     private const int DefaultPort = 5083;
     private const string PortPreferenceKey = "OpenCaddis.Server.Port";
     private const string AddOnPathPreferenceKey = "OpenCaddis.Server.AddOnPath";
+    private const string ModePreferenceKey = "OpenCaddis.Server.Mode";
     private readonly SemaphoreSlim lifecycleLock = new(1, 1);
-    private OpenCaddisServerHost? serverHost;
+    private IOpenCaddisServerHost? serverHost;
     private bool disposed;
 
     public ServerController()
@@ -27,6 +35,10 @@ public sealed class ServerController : IDisposable
         var defaultAddOnPath = Path.Combine(FileSystem.Current.AppDataDirectory, "AddOns");
         CurrentAddOnPath = NormalizeAddOnPath(
             Preferences.Default.Get(AddOnPathPreferenceKey, defaultAddOnPath));
+        var savedMode = Preferences.Default.Get(ModePreferenceKey, (int)OpenCaddisServerMode.Server);
+        CurrentMode = Enum.IsDefined(typeof(OpenCaddisServerMode), savedMode)
+            ? (OpenCaddisServerMode)savedMode
+            : OpenCaddisServerMode.Server;
         Directory.CreateDirectory(CurrentAddOnPath);
     }
 
@@ -34,9 +46,11 @@ public sealed class ServerController : IDisposable
 
     public ServerState State { get; private set; } = ServerState.Stopped;
 
-    public string StatusMessage { get; private set; } = "The server is not running.";
+    public string StatusMessage { get; private set; } = "No OpenCaddis server mode is running.";
 
     public int CurrentPort { get; private set; }
+
+    public OpenCaddisServerMode CurrentMode { get; private set; }
 
     public string CurrentAddOnPath { get; private set; }
 
@@ -44,9 +58,19 @@ public sealed class ServerController : IDisposable
 
     public Uri ServerUri => CreateServerUri(CurrentPort);
 
+    public Uri SurfaceUri => new(ServerUri, "surface");
+
     public static Uri CreateServerUri(int port) => new($"http://localhost:{port}/");
 
+    public static string GetModeDisplayName(OpenCaddisServerMode mode) => mode switch
+    {
+        OpenCaddisServerMode.Server => "OpenCaddis Server",
+        OpenCaddisServerMode.Builder => "OpenCaddis Server Builder",
+        _ => throw new ArgumentOutOfRangeException(nameof(mode))
+    };
+
     public async Task StartAsync(
+        OpenCaddisServerMode mode,
         int port,
         string addOnPath,
         CancellationToken cancellationToken = default)
@@ -62,7 +86,7 @@ public sealed class ServerController : IDisposable
                 return;
             }
 
-            await StartCoreAsync(port, normalizedAddOnPath, cancellationToken);
+            await StartCoreAsync(mode, port, normalizedAddOnPath, cancellationToken);
         }
         finally
         {
@@ -85,6 +109,7 @@ public sealed class ServerController : IDisposable
     }
 
     public async Task RestartAsync(
+        OpenCaddisServerMode mode,
         int port,
         string addOnPath,
         CancellationToken cancellationToken = default)
@@ -96,7 +121,7 @@ public sealed class ServerController : IDisposable
         {
             ObjectDisposedException.ThrowIf(disposed, this);
             await StopCoreAsync(cancellationToken);
-            await StartCoreAsync(port, normalizedAddOnPath, cancellationToken);
+            await StartCoreAsync(mode, port, normalizedAddOnPath, cancellationToken);
         }
         finally
         {
@@ -141,27 +166,36 @@ public sealed class ServerController : IDisposable
     }
 
     private async Task StartCoreAsync(
+        OpenCaddisServerMode mode,
         int port,
         string addOnPath,
         CancellationToken cancellationToken)
     {
+        CurrentMode = mode;
         CurrentPort = port;
         CurrentAddOnPath = addOnPath;
         Directory.CreateDirectory(CurrentAddOnPath);
         Preferences.Default.Set(PortPreferenceKey, port);
         Preferences.Default.Set(AddOnPathPreferenceKey, CurrentAddOnPath);
-        SetStatus(ServerState.Starting, $"Loading add-ons from {CurrentAddOnPath}...");
+        Preferences.Default.Set(ModePreferenceKey, (int)mode);
+        var displayName = GetModeDisplayName(mode);
+        SetStatus(ServerState.Starting, $"Starting {displayName} and loading assemblies from {CurrentAddOnPath}...");
 
-        OpenCaddisServerHost? newHost = null;
+        IOpenCaddisServerHost? newHost = null;
         try
         {
-            newHost = OpenCaddisServerHost.Create(ServerUri, CurrentAddOnPath);
+            newHost = mode switch
+            {
+                OpenCaddisServerMode.Server => OpenCaddisServerHost.Create(ServerUri, CurrentAddOnPath),
+                OpenCaddisServerMode.Builder => OpenCaddisServerBuilderHost.Create(ServerUri, CurrentAddOnPath),
+                _ => throw new ArgumentOutOfRangeException(nameof(mode))
+            };
             await newHost.StartAsync(cancellationToken);
             serverHost = newHost;
             LoadedAddOnAssemblyCount = newHost.AdditionalAssemblies.Count;
             SetStatus(
                 ServerState.Running,
-                $"Running at {ServerUri} with {LoadedAddOnAssemblyCount} add-on assemblies.");
+                $"{newHost.DisplayName} is running at {ServerUri} with {LoadedAddOnAssemblyCount} add-on assemblies.");
         }
         catch (Exception exception)
         {
@@ -181,15 +215,15 @@ public sealed class ServerController : IDisposable
         serverHost = null;
         if (host is null)
         {
-            SetStatus(ServerState.Stopped, "The server is not running.");
+            SetStatus(ServerState.Stopped, "No OpenCaddis server mode is running.");
             return;
         }
 
-        SetStatus(ServerState.Stopping, "Stopping the server...");
+        SetStatus(ServerState.Stopping, $"Stopping {host.DisplayName}...");
         try
         {
             await host.StopAsync(cancellationToken);
-            SetStatus(ServerState.Stopped, "The server is not running.");
+            SetStatus(ServerState.Stopped, "No OpenCaddis server mode is running.");
         }
         catch (Exception exception)
         {

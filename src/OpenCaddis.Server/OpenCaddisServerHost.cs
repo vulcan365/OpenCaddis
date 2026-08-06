@@ -9,10 +9,11 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using System.Reflection;
+using System.Text.Encodings.Web;
 
 namespace OpenCaddis.Server;
 
-public sealed class OpenCaddisServerHost : IAsyncDisposable
+public sealed class OpenCaddisServerHost : IOpenCaddisServerHost
 {
     private const string BlazorWebScriptResourceName =
         "OpenCaddis.Server.StaticAssets.blazor.web.js";
@@ -28,22 +29,29 @@ public sealed class OpenCaddisServerHost : IAsyncDisposable
     private OpenCaddisServerHost(
         WebApplication application,
         Uri baseUri,
+        string displayName,
         string addOnPath,
         AddOnAssemblyCatalog addOnCatalog)
     {
         this.application = application;
         this.addOnCatalog = addOnCatalog;
         BaseUri = baseUri;
+        DisplayName = displayName;
         AddOnPath = addOnPath;
     }
 
     public Uri BaseUri { get; }
 
+    public string DisplayName { get; }
+
     public string AddOnPath { get; }
 
     public IReadOnlyList<Assembly> AdditionalAssemblies => addOnCatalog.Assemblies;
 
-    public static OpenCaddisServerHost Create(Uri baseUri, string addOnPath)
+    public static OpenCaddisServerHost Create(
+        Uri baseUri,
+        string addOnPath,
+        OpenCaddisServerHostOptions? options = null)
     {
         ArgumentNullException.ThrowIfNull(baseUri);
         if (!baseUri.IsAbsoluteUri || baseUri.Scheme != Uri.UriSchemeHttp ||
@@ -55,6 +63,9 @@ public sealed class OpenCaddisServerHost : IAsyncDisposable
         }
 
         ArgumentException.ThrowIfNullOrWhiteSpace(addOnPath);
+        options ??= new OpenCaddisServerHostOptions();
+        ArgumentException.ThrowIfNullOrWhiteSpace(options.DisplayName);
+        var displayName = options.DisplayName.Trim();
         var fullAddOnPath = Path.GetFullPath(addOnPath);
         var addOnCatalog = AddOnAssemblyCatalog.Load(fullAddOnPath);
 
@@ -81,6 +92,15 @@ public sealed class OpenCaddisServerHost : IAsyncDisposable
             {
                 typeof(SurfaceMessageTypes).Assembly
             };
+            foreach (var assembly in options.AdditionalAssemblies)
+            {
+                ArgumentNullException.ThrowIfNull(assembly);
+                if (!additionalAssemblies.Contains(assembly))
+                {
+                    additionalAssemblies.Add(assembly);
+                }
+            }
+
             additionalAssemblies.AddRange(addOnCatalog.Assemblies);
 
             builder.AddFabrCoreServer(new FabrCoreServerOptions
@@ -127,7 +147,7 @@ public sealed class OpenCaddisServerHost : IAsyncDisposable
                 .AddInteractiveServerRenderMode()
                 .AddFabrCoreSurfaceRoutes();
 
-            application.MapGet("/", () => Results.Content(HomePageHtml, "text/html"));
+            application.MapGet("/", () => Results.Content(CreateHomePageHtml(displayName), "text/html"));
             application.MapGet("/addons", () => Results.Ok(new
             {
                 Path = fullAddOnPath,
@@ -135,7 +155,12 @@ public sealed class OpenCaddisServerHost : IAsyncDisposable
                 Assemblies = addOnCatalog.Assemblies.Select(assembly => assembly.FullName).ToArray()
             }));
 
-            return new OpenCaddisServerHost(application, baseUri, fullAddOnPath, addOnCatalog);
+            return new OpenCaddisServerHost(
+                application,
+                baseUri,
+                displayName,
+                fullAddOnPath,
+                addOnCatalog);
         }
         catch
         {
@@ -184,13 +209,16 @@ public sealed class OpenCaddisServerHost : IAsyncDisposable
         }
     }
 
-    private const string HomePageHtml = """
+    private static string CreateHomePageHtml(string displayName)
+    {
+        var encodedDisplayName = HtmlEncoder.Default.Encode(displayName);
+        return $$"""
         <!doctype html>
         <html lang="en">
         <head>
             <meta charset="utf-8">
             <meta name="viewport" content="width=device-width, initial-scale=1">
-            <title>OpenCaddis Server</title>
+            <title>{{encodedDisplayName}}</title>
             <style>
                 body { font-family: system-ui, sans-serif; margin: 0; min-height: 100vh; display: grid; place-items: center; background: #f6f7f9; color: #172033; }
                 main { text-align: center; padding: 3rem; }
@@ -200,10 +228,11 @@ public sealed class OpenCaddisServerHost : IAsyncDisposable
         </head>
         <body>
             <main>
-                <h1>OpenCaddis Server</h1>
+                <h1>{{encodedDisplayName}}</h1>
                 <p>The server is running.</p>
             </main>
         </body>
         </html>
         """;
+    }
 }

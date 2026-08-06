@@ -18,7 +18,7 @@
                     FontFamily="OpenSansSemibold"
                     SemanticProperties.HeadingLevel="Level1" />
                 <Label
-                    Text="Run and manage the local OpenCaddis server."
+                    Text="Run either the local Server or Server Builder host."
                     FontSize="16"
                     TextColor="{AppThemeBinding Light={StaticResource Gray600}, Dark={StaticResource Gray200}}" />
             </VerticalStackLayout>
@@ -50,6 +50,25 @@
                     <BoxView HeightRequest="1" Color="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray600}}" />
 
                     <VerticalStackLayout Spacing="8">
+                        <Label Text="Mode" FontFamily="OpenSansSemibold" />
+                        <Picker
+                            x:Name="ModePicker"
+                            WidthRequest="280"
+                            HorizontalOptions="Start"
+                            SelectedIndexChanged="OnModeSelectionChanged"
+                            SemanticProperties.Description="OpenCaddis server mode">
+                            <Picker.Items>
+                                <x:String>Server</x:String>
+                                <x:String>Server Builder</x:String>
+                            </Picker.Items>
+                        </Picker>
+                        <Label
+                            x:Name="ModeDescriptionLabel"
+                            FontSize="12"
+                            TextColor="{AppThemeBinding Light={StaticResource Gray600}, Dark={StaticResource Gray200}}" />
+                    </VerticalStackLayout>
+
+                    <VerticalStackLayout Spacing="8">
                         <Label Text="Local port" FontFamily="OpenSansSemibold" />
                         <Entry
                             x:Name="PortEntry"
@@ -66,14 +85,14 @@
                     </VerticalStackLayout>
 
                     <VerticalStackLayout Spacing="8">
-                        <Label Text="Add-on assemblies path" FontFamily="OpenSansSemibold" />
+                        <Label Text="Compiled assemblies path" FontFamily="OpenSansSemibold" />
                         <Entry
                             x:Name="AddOnPathEntry"
                             HorizontalOptions="Fill"
                             ClearButtonVisibility="WhileEditing"
-                            SemanticProperties.Description="Directory containing server add-on assemblies" />
+                            SemanticProperties.Description="Directory containing compiled OpenCaddis assemblies" />
                         <Label
-                            Text="Managed DLLs in this directory are read each time the server starts or restarts."
+                            Text="Both modes depend on this path. Server loads its managed DLLs; Builder will later compile projects into it."
                             FontSize="12"
                             TextColor="{AppThemeBinding Light={StaticResource Gray600}, Dark={StaticResource Gray200}}" />
                     </VerticalStackLayout>

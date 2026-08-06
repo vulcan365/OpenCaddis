@@ -26,7 +26,7 @@
                     HorizontalTextAlignment="Center" />
                 <Label
                     x:Name="UnavailableMessageLabel"
-                    Text="Start OpenCaddis Server to use Surface."
+                    Text="Start OpenCaddis Server or Server Builder to use Surface."
                     FontSize="16"
                     HorizontalTextAlignment="Center"
                     TextColor="{AppThemeBinding Light={StaticResource Gray600}, Dark={StaticResource Gray200}}" />

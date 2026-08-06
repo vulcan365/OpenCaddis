@@ -29,10 +29,9 @@ public partial class SurfacePage : ContentPage
     {
         if (serverController.State == ServerState.Running)
         {
-            var surfaceUri = new Uri(serverController.ServerUri, "surface");
             UnavailableView.IsVisible = false;
             SurfaceWebView.IsVisible = true;
-            SurfaceWebView.Source = surfaceUri.ToString();
+            SurfaceWebView.Source = serverController.SurfaceUri.ToString();
             return;
         }
 
@@ -41,10 +40,10 @@ public partial class SurfacePage : ContentPage
         UnavailableView.IsVisible = true;
         UnavailableMessageLabel.Text = serverController.State switch
         {
-            ServerState.Starting => "OpenCaddis Server is starting.",
-            ServerState.Stopping => "OpenCaddis Server is stopping.",
+            ServerState.Starting => serverController.StatusMessage,
+            ServerState.Stopping => serverController.StatusMessage,
             ServerState.Failed => serverController.StatusMessage,
-            _ => "Start OpenCaddis Server to use Surface."
+            _ => "Start OpenCaddis Server or Server Builder to use Surface."
         };
     }
 }

@@ -10,6 +10,7 @@ public partial class ServerPage : ContentPage
     {
         InitializeComponent();
         this.serverController = serverController;
+        ModePicker.SelectedIndex = serverController.CurrentMode == OpenCaddisServerMode.Builder ? 1 : 0;
         PortEntry.Text = serverController.CurrentPort.ToString();
         AddOnPathEntry.Text = serverController.CurrentAddOnPath;
         serverController.StatusChanged += OnServerStatusChanged;
@@ -18,14 +19,14 @@ public partial class ServerPage : ContentPage
 
     private async void OnStartClicked(object? sender, EventArgs e)
     {
-        if (!TryGetSettings(out var port, out var addOnPath))
+        if (!TryGetSettings(out var mode, out var port, out var addOnPath))
         {
             return;
         }
 
         try
         {
-            await serverController.StartAsync(port, addOnPath);
+            await serverController.StartAsync(mode, port, addOnPath);
         }
         catch (Exception exception)
         {
@@ -47,14 +48,14 @@ public partial class ServerPage : ContentPage
 
     private async void OnRestartClicked(object? sender, EventArgs e)
     {
-        if (!TryGetSettings(out var port, out var addOnPath))
+        if (!TryGetSettings(out var mode, out var port, out var addOnPath))
         {
             return;
         }
 
         try
         {
-            await serverController.RestartAsync(port, addOnPath);
+            await serverController.RestartAsync(mode, port, addOnPath);
         }
         catch (Exception exception)
         {
@@ -74,8 +75,21 @@ public partial class ServerPage : ContentPage
             : "Enter a port from 1 to 65535";
     }
 
-    private bool TryGetSettings(out int port, out string addOnPath)
+    private void OnModeSelectionChanged(object? sender, EventArgs e)
     {
+        ModeDescriptionLabel.Text = ModePicker.SelectedIndex == 1
+            ? "Builder currently hosts the same FabrCore and Surface server; custom project-building agents come next."
+            : "Server loads compiled add-on assemblies from the configured path.";
+    }
+
+    private bool TryGetSettings(
+        out OpenCaddisServerMode mode,
+        out int port,
+        out string addOnPath)
+    {
+        mode = ModePicker.SelectedIndex == 1
+            ? OpenCaddisServerMode.Builder
+            : OpenCaddisServerMode.Server;
         addOnPath = string.Empty;
         if (!int.TryParse(PortEntry.Text, out port) || port is < 1 or > 65535)
         {
@@ -108,6 +122,7 @@ public partial class ServerPage : ContentPage
         var isBusy = serverController.State is ServerState.Starting or ServerState.Stopping;
         var isRunning = serverController.State == ServerState.Running;
 
+        ModePicker.IsEnabled = !isBusy && !isRunning;
         PortEntry.IsEnabled = !isBusy && !isRunning;
         AddOnPathEntry.IsEnabled = !isBusy && !isRunning;
         StartButton.IsEnabled = !isBusy && !isRunning;
