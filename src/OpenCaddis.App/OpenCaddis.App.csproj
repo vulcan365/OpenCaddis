@@ -27,13 +27,16 @@
 
 		<!-- Display name -->
 		<ApplicationTitle>OpenCaddis</ApplicationTitle>
+		<Company>OpenCaddis</Company>
+		<Product>OpenCaddis</Product>
+		<Description>Open-source local FabrCore agent workspace and add-on builder.</Description>
 
 		<!-- App Identifier -->
-		<ApplicationId>com.companyname.opencaddis.app</ApplicationId>
+		<ApplicationId>ai.opencaddis.app</ApplicationId>
 
 		<!-- Versions -->
-		<ApplicationDisplayVersion>1.0</ApplicationDisplayVersion>
-		<ApplicationVersion>1</ApplicationVersion>
+		<ApplicationDisplayVersion>0.6.1</ApplicationDisplayVersion>
+		<ApplicationVersion>6001</ApplicationVersion>
 
 		<!-- To develop, package, and publish an app to the Microsoft Store, see: https://aka.ms/MauiTemplateUnpackaged -->
 		<WindowsPackageType>None</WindowsPackageType>
@@ -47,10 +50,10 @@
 
 	<ItemGroup>
 		<!-- App Icon -->
-		<MauiIcon Include="Resources\AppIcon\appicon.svg" ForegroundFile="Resources\AppIcon\appiconfg.svg" Color="#512BD4" />
+		<MauiIcon Include="Resources\AppIcon\appicon.svg" ForegroundFile="Resources\AppIcon\appiconfg.png" ForegroundScale="0.9" Color="#0F766E" />
 
 		<!-- Splash Screen -->
-		<MauiSplashScreen Include="Resources\Splash\splash.svg" Color="#512BD4" BaseSize="128,128" />
+		<MauiSplashScreen Include="Resources\Splash\splash.png" Color="#0F766E" BaseSize="256,256" />
 
 		<!-- Images -->
 		<MauiImage Include="Resources\Images\*" />

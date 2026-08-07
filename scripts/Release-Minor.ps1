@@ -49,5 +49,4 @@ if ($LASTEXITCODE -ne 0) {
 
 Write-Host "Tag $newTag pushed." -ForegroundColor Green
 Write-Host 'Switched to develop.' -ForegroundColor Green
-Write-Host 'Create the release notes at:' -ForegroundColor Cyan
-Write-Host "  https://github.com/vulcan365/OpenCaddis/releases/new?tag=$newTag" -ForegroundColor Cyan
+Write-Host 'The Release Windows workflow will build and publish the GitHub release assets.' -ForegroundColor Cyan
