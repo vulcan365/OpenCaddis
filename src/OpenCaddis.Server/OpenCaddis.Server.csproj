@@ -18,6 +18,14 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\OpenCaddis.Sdk\OpenCaddis.Sdk.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="OpenCaddis.Server.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
     <Content Update="fabrcore-surface.json" CopyToOutputDirectory="PreserveNewest" />
     <EmbeddedResource Include="$(PkgMicrosoft_AspNetCore_App_Internal_Assets)\_framework\blazor.web.js"
                       LogicalName="OpenCaddis.Server.StaticAssets.blazor.web.js" />

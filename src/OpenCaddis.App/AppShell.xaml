@@ -26,6 +26,15 @@
     </FlyoutItem>
 
     <FlyoutItem
+        Title="Connections"
+        Route="connections">
+        <ShellContent
+            x:Name="ConnectionsContent"
+            Title="Connections"
+            Route="connections-page" />
+    </FlyoutItem>
+
+    <FlyoutItem
         Title="Builder"
         Route="builder">
         <ShellContent

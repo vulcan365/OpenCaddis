@@ -2,9 +2,14 @@ using System.Net;
 using System.Net.Sockets;
 using System.Reflection;
 using System.Reflection.Emit;
+using System.Security;
 using FabrCore.Sdk;
+using Microsoft.Extensions.DependencyInjection;
+using OpenCaddis.Sdk.Addons;
+using OpenCaddis.Sdk.Connections;
 using OpenCaddis.Server;
 using OpenCaddis.Server.Builder;
+using OpenCaddis.Server.Connections;
 
 namespace OpenCaddis.Server.Tests;
 
@@ -197,6 +202,208 @@ public sealed class OpenCaddisServerHostTests
         {
             Directory.Delete(addOnPath, recursive: true);
         }
+    }
+
+    [TestMethod]
+    public async Task Collectible_add_on_registers_provider_neutral_connections_and_unregisters_on_dispose()
+    {
+        var port = FindAvailablePort();
+        var baseUri = new Uri($"http://localhost:{port}/");
+        var root = Path.Combine(
+            Path.GetTempPath(),
+            "OpenCaddis.Connection.AddOn.Tests",
+            Guid.NewGuid().ToString("N"));
+        var addOnPath = Path.Combine(root, "AddOns");
+        var connectionPath = Path.Combine(root, "Connections");
+        Directory.CreateDirectory(addOnPath);
+        await CompileConnectionAddonAsync(root, addOnPath);
+        await using var cloud = await TestOpenCaddisCloudServer.CreateAsync(OpenCaddisCloudTarget.Server);
+        await using var services = new ServiceCollection().BuildServiceProvider();
+        await using var runtime = new OpenCaddisConnectionRuntime(
+            connectionPath,
+            new TestSecretStore(),
+            new TestBrowser(),
+            services);
+        var options = new OpenCaddisServerHostOptions
+        {
+            CloudServer = cloud.Connection(OpenCaddisCloudTarget.Server),
+            ConnectionRuntime = runtime
+        };
+
+        try
+        {
+            await using (var host = OpenCaddisServerHost.Create(baseUri, addOnPath, options))
+            {
+                Assert.HasCount(1, host.AdditionalAssemblies);
+                Assert.AreEqual(3, runtime.GetProviders().Count);
+                Assert.AreEqual(3, runtime.GetRequirements().Count);
+                Assert.IsTrue(runtime.GetProviders().Any(provider => provider.Id == "synthetic-microsoft"));
+                Assert.IsTrue(runtime.GetProviders().Any(provider => provider.Id == "synthetic-google"));
+                Assert.IsTrue(runtime.GetProviders().Any(provider => provider.Id == "synthetic-service"));
+            }
+
+            Assert.IsEmpty(runtime.GetProviders());
+            Assert.IsEmpty(runtime.GetRequirements());
+
+            await using (var restarted = OpenCaddisServerHost.Create(baseUri, addOnPath, options))
+            {
+                Assert.AreEqual(3, runtime.GetProviders().Count);
+                Assert.AreEqual(3, runtime.GetRequirements().Count);
+            }
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    private static async Task CompileConnectionAddonAsync(string root, string addOnPath)
+    {
+        var projectPath = Path.Combine(root, "SyntheticConnections.csproj");
+        var sourcePath = Path.Combine(root, "SyntheticConnections.cs");
+        var sdkPath = SecurityElement.Escape(typeof(IOpenCaddisAddonModule).Assembly.Location);
+        var fabrCorePath = SecurityElement.Escape(typeof(IFabrCorePlugin).Assembly.Location);
+        await File.WriteAllTextAsync(projectPath, $$"""
+            <Project Sdk="Microsoft.NET.Sdk">
+              <PropertyGroup>
+                <TargetFramework>net10.0</TargetFramework>
+                <Nullable>enable</Nullable>
+                <ImplicitUsings>enable</ImplicitUsings>
+              </PropertyGroup>
+              <ItemGroup>
+                <Reference Include="OpenCaddis.Sdk" HintPath="{{sdkPath}}" Private="false" />
+                <Reference Include="FabrCore.Sdk" HintPath="{{fabrCorePath}}" Private="false" />
+              </ItemGroup>
+            </Project>
+            """);
+        await File.WriteAllTextAsync(sourcePath, """
+            using OpenCaddis.Sdk.Addons;
+            using OpenCaddis.Sdk.Connections;
+
+            public sealed class SyntheticConnectionsModule : IOpenCaddisAddonModule
+            {
+                public void Configure(OpenCaddisAddonBuilder builder)
+                {
+                    builder.SetIdentity("synthetic.connections", "Synthetic connections", "1.0.0")
+                        .AddConnectionProvider(Delegated(
+                            "synthetic-microsoft",
+                            "Synthetic Microsoft",
+                            "https://login.microsoftonline.com/common/oauth2/v2.0/authorize",
+                            "https://login.microsoftonline.com/common/oauth2/v2.0/token"))
+                        .AddConnectionProvider(Delegated(
+                            "synthetic-google",
+                            "Synthetic Google",
+                            "https://accounts.google.com/o/oauth2/v2/auth",
+                            "https://oauth2.googleapis.com/token"))
+                        .AddConnectionProvider(new ConnectionProviderDescriptor
+                        {
+                            Id = "synthetic-service",
+                            DisplayName = "Synthetic service",
+                            AuthenticationKind = ConnectionAuthenticationKind.OAuthClientCredentials,
+                            TokenEndpoint = new Uri("https://identity.example.test/token"),
+                            ConfigurationFields = ClientFields()
+                        })
+                        .AddConnectionRequirement(Requirement(
+                            "synthetic.connections.microsoft", "synthetic-microsoft", "Mail.Read"))
+                        .AddConnectionRequirement(Requirement(
+                            "synthetic.connections.gmail", "synthetic-google",
+                            "https://www.googleapis.com/auth/gmail.readonly"))
+                        .AddConnectionRequirement(Requirement(
+                            "synthetic.connections.service", "synthetic-service", "records.read"));
+                }
+
+                private static ConnectionProviderDescriptor Delegated(
+                    string id, string name, string authorizationEndpoint, string tokenEndpoint) => new()
+                {
+                    Id = id,
+                    DisplayName = name,
+                    AuthenticationKind = ConnectionAuthenticationKind.OAuthAuthorizationCodePkce,
+                    AuthorizationEndpoint = new Uri(authorizationEndpoint),
+                    TokenEndpoint = new Uri(tokenEndpoint),
+                    ConfigurationFields =
+                    [
+                        new ConnectionConfigurationField
+                        {
+                            Name = "clientId", Label = "Client ID", Required = true
+                        }
+                    ]
+                };
+
+                private static IReadOnlyList<ConnectionConfigurationField> ClientFields() =>
+                [
+                    new ConnectionConfigurationField
+                    {
+                        Name = "clientId", Label = "Client ID", Required = true
+                    },
+                    new ConnectionConfigurationField
+                    {
+                        Name = "clientSecret", Label = "Client secret", Required = true,
+                        Kind = ConnectionConfigurationFieldKind.Secret, Sensitive = true
+                    }
+                ];
+
+                private static ConnectionRequirement Requirement(string id, string providerId, string scope) => new()
+                {
+                    Id = id,
+                    AddonId = "synthetic.connections",
+                    ProviderId = providerId,
+                    DisplayName = id,
+                    Purpose = "Synthetic acceptance coverage",
+                    Scopes = [scope]
+                };
+            }
+            """);
+
+        var startInfo = new System.Diagnostics.ProcessStartInfo
+        {
+            FileName = "dotnet",
+            WorkingDirectory = root,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false,
+            CreateNoWindow = true
+        };
+        foreach (var argument in new[]
+                 {
+                     "build", projectPath, "--configuration", "Release", "--output", addOnPath,
+                     "--nologo"
+                 })
+        {
+            startInfo.ArgumentList.Add(argument);
+        }
+
+        using var process = System.Diagnostics.Process.Start(startInfo)
+            ?? throw new InvalidOperationException("Could not start dotnet to build the synthetic add-on.");
+        var outputTask = process.StandardOutput.ReadToEndAsync();
+        var errorTask = process.StandardError.ReadToEndAsync();
+        await process.WaitForExitAsync();
+        var output = await outputTask + await errorTask;
+        if (process.ExitCode != 0)
+        {
+            throw new InvalidOperationException($"Synthetic connection add-on build failed: {output}");
+        }
+    }
+
+    private sealed class TestSecretStore : IOpenCaddisSecretStore
+    {
+        private readonly Dictionary<string, string> values = new(StringComparer.OrdinalIgnoreCase);
+
+        public Task<string?> GetAsync(string key, CancellationToken cancellationToken = default) =>
+            Task.FromResult(values.GetValueOrDefault(key));
+
+        public Task SetAsync(string key, string value, CancellationToken cancellationToken = default)
+        {
+            values[key] = value;
+            return Task.CompletedTask;
+        }
+
+        public Task<bool> RemoveAsync(string key, CancellationToken cancellationToken = default) =>
+            Task.FromResult(values.Remove(key));
+    }
+
+    private sealed class TestBrowser : IOpenCaddisInteractiveBrowser
+    {
+        public Task OpenAsync(Uri uri, CancellationToken cancellationToken = default) => Task.CompletedTask;
     }
 
     private static void CreateManagedAssembly(

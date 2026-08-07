@@ -62,11 +62,13 @@ public sealed class BuilderWorkspaceServiceTests
     }
 
     [TestMethod]
-    public async Task Embedded_fabrcore_skills_are_individually_published_and_pinned()
+    public async Task Embedded_builder_skills_are_individually_published_and_pinned()
     {
         var packages = AddonBuilderSkillPackages.GetPackages();
-        Assert.HasCount(24, packages);
-        Assert.IsTrue(packages.All(package => package.Name.StartsWith("fabrcore", StringComparison.Ordinal)));
+        Assert.HasCount(25, packages);
+        Assert.HasCount(24, packages.Where(package =>
+            package.Name.StartsWith("fabrcore", StringComparison.Ordinal)));
+        Assert.IsTrue(packages.Any(package => package.Name == "opencaddis"));
         Assert.HasCount(packages.Count, packages.Select(package => package.Name).Distinct(StringComparer.Ordinal));
 
         foreach (var package in packages)
@@ -76,6 +78,20 @@ public sealed class BuilderWorkspaceServiceTests
             Assert.IsNotNull(archive.GetEntry("SKILL.md"), $"{package.Name} must contain SKILL.md at its root.");
             Assert.IsTrue(archive.Entries.All(entry =>
                 entry.FullName.Split('/').Length - 1 <= FabrCoreSkillStorage.MaxResourceDepth));
+        }
+
+        var openCaddisPackage = packages.Single(package => package.Name == "opencaddis");
+        using (var archive = new ZipArchive(openCaddisPackage.OpenRead(), ZipArchiveMode.Read))
+        {
+            Assert.IsNotNull(archive.GetEntry("agents/openai.yaml"));
+            Assert.IsNotNull(archive.GetEntry("references/connection-model.md"));
+            Assert.IsNotNull(archive.GetEntry("references/provider-recipes.md"));
+            Assert.IsNotNull(archive.GetEntry("references/fabrcore-agent-integration.md"));
+            Assert.IsNotNull(archive.GetEntry("references/development-and-operations.md"));
+            using var reader = new StreamReader(archive.GetEntry("SKILL.md")!.Open());
+            var markdown = await reader.ReadToEndAsync();
+            Assert.Contains("IOpenCaddisAddonModule", markdown);
+            Assert.Contains("AuthorizeHttpRequestAsync", markdown);
         }
 
         var published = new List<string>();
@@ -131,6 +147,8 @@ public sealed class BuilderWorkspaceServiceTests
             Assert.Contains("<TargetFramework>net10.0</TargetFramework>", projectFile);
             Assert.Contains("FabrCore.Sdk", projectFile);
             Assert.Contains(BuilderWorkspaceService.FabrCoreSdkVersion, projectFile);
+            Assert.Contains("OpenCaddis.Sdk", projectFile);
+            Assert.Contains(BuilderWorkspaceService.OpenCaddisSdkVersion, projectFile);
 
             var solutionFile = await File.ReadAllTextAsync(
                 projectResult.Workspace.SolutionFilePath!);

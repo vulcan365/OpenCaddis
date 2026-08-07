@@ -1,6 +1,7 @@
 using Microsoft.Maui.Storage;
 using OpenCaddis.Server;
 using OpenCaddis.Server.Builder;
+using OpenCaddis.Server.Connections;
 
 namespace OpenCaddis.App.Services;
 
@@ -28,15 +29,18 @@ public sealed class ServerController : IDisposable
     private readonly SemaphoreSlim lifecycleLock = new(1, 1);
     private readonly OpenCaddisCloudConfigurationStore cloudConfigurationStore;
     private readonly OpenCaddisCloudServerHost cloudServer;
+    private readonly OpenCaddisConnectionRuntime connectionRuntime;
     private IOpenCaddisServerHost? serverHost;
     private bool disposed;
 
     public ServerController(
         OpenCaddisCloudConfigurationStore cloudConfigurationStore,
-        OpenCaddisCloudServerHost cloudServer)
+        OpenCaddisCloudServerHost cloudServer,
+        OpenCaddisConnectionRuntime connectionRuntime)
     {
         this.cloudConfigurationStore = cloudConfigurationStore;
         this.cloudServer = cloudServer;
+        this.connectionRuntime = connectionRuntime;
         CurrentPort = Preferences.Default.Get(PortPreferenceKey, DefaultPort);
         var defaultAddOnPath = Path.Combine(FileSystem.Current.AppDataDirectory, "AddOns");
         CurrentAddOnPath = NormalizeAddOnPath(
@@ -216,11 +220,16 @@ public sealed class ServerController : IDisposable
                 OpenCaddisServerMode.Server => OpenCaddisServerHost.Create(
                     ServerUri,
                     CurrentAddOnPath,
-                    new OpenCaddisServerHostOptions { CloudServer = cloudConnection }),
+                    new OpenCaddisServerHostOptions
+                    {
+                        CloudServer = cloudConnection,
+                        ConnectionRuntime = connectionRuntime
+                    }),
                 OpenCaddisServerMode.Builder => OpenCaddisServerBuilderHost.Create(
                     ServerUri,
                     CurrentAddOnPath,
-                    cloudConnection),
+                    cloudConnection,
+                    connectionRuntime),
                 _ => throw new ArgumentOutOfRangeException(nameof(mode))
             };
             await newHost.StartAsync(cancellationToken);

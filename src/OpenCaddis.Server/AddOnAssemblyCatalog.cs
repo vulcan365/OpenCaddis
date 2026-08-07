@@ -132,6 +132,7 @@ internal sealed class AddOnAssemblyCatalog : IDisposable
         var name = assemblyName.Name;
         if (name is null ||
             !(name.Equals("OpenCaddis.Server", StringComparison.OrdinalIgnoreCase) ||
+              name.Equals("OpenCaddis.Sdk", StringComparison.OrdinalIgnoreCase) ||
               name.StartsWith("FabrCore.", StringComparison.OrdinalIgnoreCase) ||
               name.StartsWith("Orleans.", StringComparison.OrdinalIgnoreCase) ||
               name.StartsWith("Microsoft.", StringComparison.OrdinalIgnoreCase) ||

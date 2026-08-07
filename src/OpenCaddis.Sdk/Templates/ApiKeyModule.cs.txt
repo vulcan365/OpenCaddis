@@ -1,0 +1,35 @@
+using OpenCaddis.Sdk.Addons;
+using OpenCaddis.Sdk.Connections;
+
+public sealed class ExampleApiKeyModule : IOpenCaddisAddonModule
+{
+    public void Configure(OpenCaddisAddonBuilder builder)
+    {
+        builder.SetIdentity("example.weather", "Example weather add-on", "1.0.0")
+            .AddConnectionProvider(new ConnectionProviderDescriptor
+            {
+                Id = "example-weather-key",
+                DisplayName = "Example Weather API",
+                AuthenticationKind = ConnectionAuthenticationKind.ApiKey,
+                ApiKeyHeaderName = "X-Api-Key",
+                ApiKeyConfigurationField = "apiKey",
+                ConfigurationFields =
+                [
+                    new ConnectionConfigurationField
+                    {
+                        Name = "apiKey", Label = "API key", Required = true,
+                        Kind = ConnectionConfigurationFieldKind.Secret, Sensitive = true
+                    }
+                ]
+            })
+            .AddConnectionRequirement(new ConnectionRequirement
+            {
+                Id = "example.weather.forecast",
+                AddonId = "example.weather",
+                ProviderId = "example-weather-key",
+                DisplayName = "Weather forecasts",
+                Purpose = "Retrieve forecasts through the add-on tools.",
+                CredentialKind = ConnectionCredentialKind.ApiKey
+            });
+    }
+}

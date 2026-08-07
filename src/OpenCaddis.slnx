@@ -5,4 +5,5 @@
   <Project Path="OpenCaddis.Server.Builder/OpenCaddis.Server.Builder.csproj" />
   <Project Path="OpenCaddis.Server/OpenCaddis.Server.csproj" Id="edf0481b-75aa-4764-a3e7-e54326ad3ff8" />
   <Project Path="OpenCaddis.Server.Tests/OpenCaddis.Server.Tests.csproj" />
+  <Project Path="OpenCaddis.Sdk/OpenCaddis.Sdk.csproj" />
 </Solution>

@@ -1,5 +1,6 @@
 using OpenCaddis.Server;
 using System.Reflection;
+using OpenCaddis.Server.Connections;
 
 namespace OpenCaddis.Server.Builder;
 
@@ -23,13 +24,15 @@ public sealed class OpenCaddisServerBuilderHost : IOpenCaddisServerHost
     public static OpenCaddisServerBuilderHost Create(
         Uri baseUri,
         string addOnPath,
-        OpenCaddisCloudServerConnection cloudServer)
+        OpenCaddisCloudServerConnection cloudServer,
+        OpenCaddisConnectionRuntime? connectionRuntime = null)
     {
         ArgumentNullException.ThrowIfNull(cloudServer);
         var options = new OpenCaddisServerHostOptions
         {
             DisplayName = "OpenCaddis Server Builder",
             CloudServer = cloudServer,
+            ConnectionRuntime = connectionRuntime,
             LoadAssembliesFromAddOnPath = false
         };
 

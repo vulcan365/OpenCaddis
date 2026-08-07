@@ -8,6 +8,8 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
+using OpenCaddis.Sdk.Addons;
+using OpenCaddis.Sdk.Connections;
 using System.Reflection;
 using System.Text.Encodings.Web;
 
@@ -25,6 +27,7 @@ public sealed class OpenCaddisServerHost : IOpenCaddisServerHost
 
     private readonly WebApplication application;
     private readonly AddOnAssemblyCatalog addOnCatalog;
+    private readonly IReadOnlyList<IDisposable> connectionRegistrations;
     private bool disposed;
 
     private OpenCaddisServerHost(
@@ -32,10 +35,12 @@ public sealed class OpenCaddisServerHost : IOpenCaddisServerHost
         Uri baseUri,
         string displayName,
         string addOnPath,
-        AddOnAssemblyCatalog addOnCatalog)
+        AddOnAssemblyCatalog addOnCatalog,
+        IReadOnlyList<IDisposable> connectionRegistrations)
     {
         this.application = application;
         this.addOnCatalog = addOnCatalog;
+        this.connectionRegistrations = connectionRegistrations;
         BaseUri = baseUri;
         DisplayName = displayName;
         AddOnPath = addOnPath;
@@ -120,6 +125,12 @@ public sealed class OpenCaddisServerHost : IOpenCaddisServerHost
             builder.Services.AddRazorComponents()
                 .AddInteractiveServerComponents();
 
+            var addonRegistrations = ConfigureAddonModules(builder.Services, addOnCatalog.Assemblies);
+            if (options.ConnectionRuntime is not null)
+            {
+                builder.Services.AddSingleton<IOpenCaddisConnectionClientFactory>(options.ConnectionRuntime);
+            }
+
             var additionalAssemblies = new List<Assembly>
             {
                 typeof(SurfaceMessageTypes).Assembly
@@ -161,6 +172,27 @@ public sealed class OpenCaddisServerHost : IOpenCaddisServerHost
             });
 
             var application = builder.Build();
+            var connectionRegistrations = new List<IDisposable>();
+            if (options.ConnectionRuntime is not null)
+            {
+                try
+                {
+                    foreach (var registration in addonRegistrations)
+                    {
+                        connectionRegistrations.Add(
+                            options.ConnectionRuntime.RegisterAddon(registration, application.Services));
+                    }
+                }
+                catch
+                {
+                    foreach (var registration in connectionRegistrations)
+                    {
+                        registration.Dispose();
+                    }
+                    application.DisposeAsync().AsTask().GetAwaiter().GetResult();
+                    throw;
+                }
+            }
             UseBufferedHarnessSkillUploads(application);
             application.UseAntiforgery();
             application.UseFabrCoreServer(new FabrCoreServerOptions());
@@ -197,7 +229,8 @@ public sealed class OpenCaddisServerHost : IOpenCaddisServerHost
                 baseUri,
                 displayName,
                 fullAddOnPath,
-                addOnCatalog);
+                addOnCatalog,
+                connectionRegistrations);
         }
         catch
         {
@@ -291,12 +324,75 @@ public sealed class OpenCaddisServerHost : IOpenCaddisServerHost
         disposed = true;
         try
         {
+            foreach (var registration in connectionRegistrations)
+            {
+                registration.Dispose();
+            }
             await application.DisposeAsync();
         }
         finally
         {
             addOnCatalog.Dispose();
         }
+    }
+
+    private static IReadOnlyList<OpenCaddisAddonRegistration> ConfigureAddonModules(
+        IServiceCollection services,
+        IReadOnlyList<Assembly> assemblies)
+    {
+        var registrations = new List<OpenCaddisAddonRegistration>();
+        foreach (var assembly in assemblies)
+        {
+            Type[] types;
+            try
+            {
+                types = assembly.GetTypes();
+            }
+            catch (ReflectionTypeLoadException exception)
+            {
+                types = exception.Types.Where(type => type is not null).Cast<Type>().ToArray();
+            }
+
+            var moduleTypes = types
+                .Where(type =>
+                    !type.IsAbstract &&
+                    !type.IsInterface &&
+                    typeof(IOpenCaddisAddonModule).IsAssignableFrom(type))
+                .ToArray();
+            if (moduleTypes.Length > 1)
+            {
+                throw new InvalidOperationException(
+                    $"Add-on assembly '{assembly.GetName().Name}' contains more than one IOpenCaddisAddonModule.");
+            }
+            if (moduleTypes.Length == 0)
+            {
+                continue;
+            }
+
+            var moduleType = moduleTypes[0];
+            if (moduleType.GetConstructor(Type.EmptyTypes) is null)
+            {
+                throw new InvalidOperationException(
+                    $"Add-on module '{moduleType.FullName}' must have a public parameterless constructor.");
+            }
+
+            var module = (IOpenCaddisAddonModule)Activator.CreateInstance(moduleType)!;
+            var addonBuilder = new OpenCaddisAddonBuilder(services);
+            module.Configure(addonBuilder);
+            var registration = addonBuilder.Build();
+            ConnectionValidation.Validate(registration);
+            registrations.Add(registration);
+        }
+
+        var duplicateId = registrations
+            .GroupBy(registration => registration.Id, StringComparer.OrdinalIgnoreCase)
+            .FirstOrDefault(group => group.Count() > 1);
+        if (duplicateId is not null)
+        {
+            throw new InvalidOperationException($"Add-on ID '{duplicateId.Key}' is registered by multiple assemblies.");
+        }
+
+        return registrations;
     }
 
     private static string CreateHomePageHtml(string displayName)

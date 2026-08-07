@@ -1,0 +1,42 @@
+using OpenCaddis.Sdk.Addons;
+using OpenCaddis.Sdk.Connections;
+
+public sealed class ExampleDelegatedOAuthModule : IOpenCaddisAddonModule
+{
+    public void Configure(OpenCaddisAddonBuilder builder)
+    {
+        builder.SetIdentity("example.gmail", "Example Gmail add-on", "1.0.0")
+            .AddConnectionProvider(new ConnectionProviderDescriptor
+            {
+                Id = "google",
+                DisplayName = "Google",
+                Description = "A delegated Google account.",
+                AuthenticationKind = ConnectionAuthenticationKind.OAuthAuthorizationCodePkce,
+                AuthorizationEndpoint = new Uri("https://accounts.google.com/o/oauth2/v2/auth"),
+                TokenEndpoint = new Uri("https://oauth2.googleapis.com/token"),
+                RevocationEndpoint = new Uri("https://oauth2.googleapis.com/revoke"),
+                UserInfoEndpoint = new Uri("https://openidconnect.googleapis.com/v1/userinfo"),
+                AuthorizationParameters = new Dictionary<string, string>
+                {
+                    ["access_type"] = "offline",
+                    ["prompt"] = "consent"
+                },
+                ConfigurationFields =
+                [
+                    new ConnectionConfigurationField
+                    {
+                        Name = "clientId", Label = "OAuth client ID", Required = true
+                    }
+                ]
+            })
+            .AddConnectionRequirement(new ConnectionRequirement
+            {
+                Id = "example.gmail.read",
+                AddonId = "example.gmail",
+                ProviderId = "google",
+                DisplayName = "Read Gmail",
+                Purpose = "Read messages requested through the Gmail tools.",
+                Scopes = ["https://www.googleapis.com/auth/gmail.readonly"]
+            });
+    }
+}

@@ -90,7 +90,7 @@ internal static class AddonBuilderSkillPackages
         if (packages.Length == 0)
         {
             throw new InvalidOperationException(
-                "No embedded FabrCore Agent Skill packages were found in OpenCaddis.Server.Builder.");
+                "No embedded Agent Skill packages were found in OpenCaddis.Server.Builder.");
         }
 
         var duplicate = packages

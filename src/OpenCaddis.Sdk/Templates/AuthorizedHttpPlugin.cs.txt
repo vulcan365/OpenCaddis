@@ -1,0 +1,42 @@
+using System.ComponentModel;
+using FabrCore.Core;
+using FabrCore.Sdk;
+using Microsoft.Extensions.DependencyInjection;
+using OpenCaddis.Sdk.Connections;
+
+[PluginAlias("example-api")]
+[Description("Tools backed by an authenticated external API")]
+public sealed class ExampleApiPlugin : IFabrCorePlugin
+{
+    private const string AddonId = "example.service";
+    private const string RequirementId = "example.service.read";
+    private IOpenCaddisConnectionClient connections = default!;
+    private HttpClient httpClient = default!;
+
+    public Task InitializeAsync(AgentConfiguration config, IServiceProvider services)
+    {
+        var agentHost = services.GetRequiredService<IFabrCoreAgentHost>();
+        connections = services.GetRequiredService<IOpenCaddisConnectionClientFactory>()
+            .ForAgent(agentHost, AddonId);
+        httpClient = services.GetRequiredService<HttpClient>();
+        return Task.CompletedTask;
+    }
+
+    [Description("Gets a record from the external API.")]
+    public async Task<string> GetRecordAsync(
+        [Description("Record identifier")] string id,
+        CancellationToken cancellationToken = default)
+    {
+        using var request = new HttpRequestMessage(
+            HttpMethod.Get, $"https://api.example.com/records/{Uri.EscapeDataString(id)}");
+        var authorization = await connections.AuthorizeHttpRequestAsync(
+            RequirementId, connectionId: null, request, cancellationToken);
+        if (!authorization.Success)
+        {
+            return $"Connection required: {authorization.Message}";
+        }
+
+        using var response = await httpClient.SendAsync(request, cancellationToken);
+        return await response.Content.ReadAsStringAsync(cancellationToken);
+    }
+}
