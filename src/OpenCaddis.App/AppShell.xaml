@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<Shell
+    x:Class="OpenCaddis.App.AppShell"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:local="clr-namespace:OpenCaddis.App"
+    Title="OpenCaddis"
+    FlyoutBehavior="Flyout">
+
+    <FlyoutItem
+        Title="Home"
+        Route="home">
+        <ShellContent
+            x:Name="HomeContent"
+            Title="Home"
+            Route="home-page" />
+    </FlyoutItem>
+
+    <FlyoutItem
+        Title="Server"
+        Route="server">
+        <ShellContent
+            x:Name="ServerContent"
+            Title="Server"
+            Route="server-page" />
+    </FlyoutItem>
+
+    <FlyoutItem
+        Title="Builder"
+        Route="builder">
+        <ShellContent
+            x:Name="BuilderContent"
+            Title="Builder"
+            Route="builder-page" />
+    </FlyoutItem>
+
+    <FlyoutItem
+        Title="Surface"
+        Route="surface">
+        <ShellContent
+            x:Name="SurfaceContent"
+            Title="Surface"
+            Route="surface-page" />
+    </FlyoutItem>
+
+</Shell>

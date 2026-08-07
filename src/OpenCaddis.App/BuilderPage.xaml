@@ -1,0 +1,176 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:builder="clr-namespace:OpenCaddis.Server.Builder;assembly=OpenCaddis.Server.Builder"
+             x:Class="OpenCaddis.App.BuilderPage"
+             Title="Builder">
+    <Grid>
+        <ScrollView x:Name="BuilderContent" IsVisible="False">
+            <VerticalStackLayout Padding="48" Spacing="24" MaximumWidthRequest="860" HorizontalOptions="Start">
+                <VerticalStackLayout Spacing="6">
+                    <Label Text="OpenCaddis Builder"
+                           FontSize="32"
+                           FontFamily="OpenSansSemibold"
+                           SemanticProperties.HeadingLevel="Level1" />
+                    <Label Text="Create and extend the .NET solution used for OpenCaddis projects."
+                           FontSize="16"
+                           TextColor="{AppThemeBinding Light={StaticResource Gray600}, Dark={StaticResource Gray200}}" />
+                </VerticalStackLayout>
+
+                <Border Padding="24">
+                    <VerticalStackLayout Spacing="18">
+                        <VerticalStackLayout Spacing="8">
+                            <Label Text="Solution folder" FontFamily="OpenSansSemibold" />
+                            <Entry x:Name="SolutionPathEntry"
+                                   HorizontalOptions="Fill"
+                                   ClearButtonVisibility="WhileEditing"
+                                   TextChanged="OnSolutionPathTextChanged"
+                                   SemanticProperties.Description="Folder containing the dotnet solution" />
+                            <Label Text="The folder must contain exactly one .sln or .slnx file. A new solution uses the folder name."
+                                   FontSize="12"
+                                   TextColor="{AppThemeBinding Light={StaticResource Gray600}, Dark={StaticResource Gray200}}" />
+                        </VerticalStackLayout>
+
+                        <BoxView HeightRequest="1"
+                                 Color="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray600}}" />
+
+                        <VerticalStackLayout Spacing="10">
+                            <Label x:Name="SolutionStatusLabel"
+                                   Text="Enter a solution folder."
+                                   LineBreakMode="WordWrap" />
+                            <HorizontalStackLayout Spacing="12">
+                                <Button x:Name="CreateSolutionButton"
+                                        Text="Create solution"
+                                        IsVisible="False"
+                                        Clicked="OnCreateSolutionClicked" />
+                                <Button x:Name="NewProjectButton"
+                                        Text="Create new project"
+                                        IsEnabled="False"
+                                        Clicked="OnShowNewProjectClicked" />
+                            </HorizontalStackLayout>
+                        </VerticalStackLayout>
+
+                        <Border x:Name="NewProjectPanel"
+                                IsVisible="False"
+                                Padding="20"
+                                BackgroundColor="{AppThemeBinding Light={StaticResource Gray100}, Dark={StaticResource Gray900}}">
+                            <VerticalStackLayout Spacing="12">
+                                <Label Text="New FabrCore class library"
+                                       FontSize="20"
+                                       FontFamily="OpenSansSemibold"
+                                       SemanticProperties.HeadingLevel="Level2" />
+                                <Label Text="The project targets .NET 10 and references FabrCore.Sdk."
+                                       TextColor="{AppThemeBinding Light={StaticResource Gray600}, Dark={StaticResource Gray200}}" />
+                                <Entry x:Name="ProjectNameEntry"
+                                       Placeholder="Example: MyCompany.Agents"
+                                       ClearButtonVisibility="WhileEditing"
+                                       TextChanged="OnProjectNameTextChanged"
+                                       SemanticProperties.Description="New class library project name" />
+                                <Label x:Name="ProjectNameValidationLabel"
+                                       FontSize="12"
+                                       TextColor="Red" />
+                                <HorizontalStackLayout Spacing="12">
+                                    <Button x:Name="CreateProjectButton"
+                                            Text="Create"
+                                            IsEnabled="False"
+                                            Clicked="OnCreateProjectClicked" />
+                                    <Button x:Name="CancelProjectButton"
+                                            Text="Cancel"
+                                            Clicked="OnCancelProjectClicked" />
+                                </HorizontalStackLayout>
+                            </VerticalStackLayout>
+                        </Border>
+                    </VerticalStackLayout>
+                </Border>
+
+                <Border x:Name="ProjectsPanel" IsVisible="False" Padding="24">
+                    <VerticalStackLayout Spacing="14">
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                            <VerticalStackLayout Spacing="4">
+                                <Label Text="Solution projects"
+                                       FontSize="20"
+                                       FontFamily="OpenSansSemibold"
+                                       SemanticProperties.HeadingLevel="Level2" />
+                                <Label x:Name="ProjectsStatusLabel"
+                                       Text="Loading projects..."
+                                       TextColor="{AppThemeBinding Light={StaticResource Gray600}, Dark={StaticResource Gray200}}" />
+                            </VerticalStackLayout>
+                            <HorizontalStackLayout Grid.Column="1" Spacing="10" VerticalOptions="Center">
+                                <ActivityIndicator x:Name="ProjectsActivityIndicator"
+                                                   IsRunning="False"
+                                                   IsVisible="False" />
+                                <Button x:Name="RefreshProjectsButton"
+                                        Text="Refresh"
+                                        Clicked="OnRefreshProjectsClicked" />
+                            </HorizontalStackLayout>
+                        </Grid>
+
+                        <CollectionView x:Name="ProjectsCollectionView"
+                                        SelectionMode="None"
+                                        EmptyView="No loadable .NET projects were found in this solution.">
+                            <CollectionView.ItemTemplate>
+                                <DataTemplate x:DataType="builder:BuilderProjectInfo">
+                                    <Border Padding="16" Margin="0,0,0,10">
+                                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="16">
+                                            <VerticalStackLayout Spacing="3">
+                                                <Label Text="{Binding Name}"
+                                                       FontFamily="OpenSansSemibold"
+                                                       FontSize="16" />
+                                                <Label Text="{Binding ProjectFilePath}"
+                                                       FontSize="12"
+                                                       LineBreakMode="MiddleTruncation"
+                                                       TextColor="{AppThemeBinding Light={StaticResource Gray600}, Dark={StaticResource Gray200}}" />
+                                                <Label Text="{Binding AgentHandle, StringFormat='Agent: {0}'}"
+                                                       FontSize="12"
+                                                       TextColor="{AppThemeBinding Light={StaticResource Gray600}, Dark={StaticResource Gray200}}" />
+                                            </VerticalStackLayout>
+                                            <Button Grid.Column="1"
+                                                    Text="Create agent"
+                                                    VerticalOptions="Center"
+                                                    CommandParameter="{Binding .}"
+                                                    Clicked="OnCreateAgentClicked" />
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </CollectionView.ItemTemplate>
+                        </CollectionView>
+                    </VerticalStackLayout>
+                </Border>
+
+                <Border x:Name="OperationPanel" IsVisible="False" Padding="20">
+                    <VerticalStackLayout Spacing="10">
+                        <HorizontalStackLayout Spacing="10">
+                            <ActivityIndicator x:Name="OperationActivityIndicator"
+                                               IsRunning="False"
+                                               IsVisible="False" />
+                            <Label x:Name="OperationStatusLabel"
+                                   FontFamily="OpenSansSemibold"
+                                   VerticalOptions="Center" />
+                        </HorizontalStackLayout>
+                        <Editor x:Name="CommandOutputEditor"
+                                IsReadOnly="True"
+                                HeightRequest="180"
+                                IsVisible="False"
+                                SemanticProperties.Description="Dotnet command output" />
+                    </VerticalStackLayout>
+                </Border>
+            </VerticalStackLayout>
+        </ScrollView>
+
+        <Grid x:Name="UnavailableView"
+              Padding="48"
+              BackgroundColor="{AppThemeBinding Light={StaticResource White}, Dark={StaticResource OffBlack}}">
+            <VerticalStackLayout HorizontalOptions="Center" VerticalOptions="Center" Spacing="12">
+                <Label Text="Builder is unavailable"
+                       FontSize="28"
+                       FontFamily="OpenSansSemibold"
+                       HorizontalTextAlignment="Center" />
+                <Label x:Name="UnavailableMessageLabel"
+                       Text="Start OpenCaddis Server Builder to manage projects."
+                       FontSize="16"
+                       HorizontalTextAlignment="Center"
+                       TextColor="{AppThemeBinding Light={StaticResource Gray600}, Dark={StaticResource Gray200}}" />
+            </VerticalStackLayout>
+        </Grid>
+    </Grid>
+</ContentPage>

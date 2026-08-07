@@ -1,0 +1,58 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <FabrCoreSkillSourceRoot>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)..\..\.agents\skills\'))</FabrCoreSkillSourceRoot>
+    <FabrCoreSkillStageRoot>$(MSBuildThisFileDirectory)obj\$(Configuration)\$(TargetFramework)\fabrcore-skills\stage\</FabrCoreSkillStageRoot>
+    <FabrCoreSkillPackageRoot>$(MSBuildThisFileDirectory)AgentSkills\</FabrCoreSkillPackageRoot>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="FabrCore.Sdk" Version="1.6.4-local.20260806162807" />
+    <PackageReference Include="FabrCore.Surface" Version="1.6.4-local.20260806162807" />
+    <PackageReference Include="Microsoft.Build.Locator" Version="1.9.1" />
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Workspaces" Version="5.0.0" />
+    <PackageReference Include="Microsoft.CodeAnalysis.Workspaces.MSBuild" Version="5.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\OpenCaddis.Server\OpenCaddis.Server.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="OpenCaddis.Server.Tests" />
+    <EmbeddedResource Include="AgentSkills\fabrcore*.zip">
+      <LogicalName>OpenCaddis.Server.Builder.AgentSkills/%(Filename)%(Extension)</LogicalName>
+    </EmbeddedResource>
+  </ItemGroup>
+
+  <!--
+    FabrCore Harness Skill packages are immutable ZIPs. Package the repository's
+    fabrcore* skills independently and embed them so the desktop app does not need
+    access to the source checkout at runtime. FabrCore skill V1 accepts text
+    resources only and limits resources to two directories below SKILL.md.
+  -->
+  <ItemGroup>
+    <FabrCoreSkillDirectory Include="$(FabrCoreSkillSourceRoot)fabrcore*\SKILL.md">
+      <SkillName>$([System.IO.Path]::GetFileName($([System.IO.Path]::GetDirectoryName('%(FullPath)'))))</SkillName>
+    </FabrCoreSkillDirectory>
+    <FabrCoreSkillSource Include="$(FabrCoreSkillSourceRoot)fabrcore*\**\*.md;$(FabrCoreSkillSourceRoot)fabrcore*\**\*.json;$(FabrCoreSkillSourceRoot)fabrcore*\**\*.yaml;$(FabrCoreSkillSourceRoot)fabrcore*\**\*.yml;$(FabrCoreSkillSourceRoot)fabrcore*\**\*.csv;$(FabrCoreSkillSourceRoot)fabrcore*\**\*.xml;$(FabrCoreSkillSourceRoot)fabrcore*\**\*.txt"
+                          Exclude="$(FabrCoreSkillSourceRoot)fabrcore-harness\assets\policy-review\**\*">
+      <DestinationPath>$([System.String]::Copy('%(FullPath)').Replace('$(FabrCoreSkillSourceRoot)', '$(FabrCoreSkillStageRoot)'))</DestinationPath>
+    </FabrCoreSkillSource>
+  </ItemGroup>
+
+  <!-- Run `dotnet msbuild -t:PackageFabrCoreAgentSkills` to refresh the checked-in packages. -->
+  <Target Name="PackageFabrCoreAgentSkills">
+    <RemoveDir Directories="$(FabrCoreSkillStageRoot);$(FabrCoreSkillPackageRoot)" />
+    <MakeDir Directories="$(FabrCoreSkillStageRoot);$(FabrCoreSkillPackageRoot)" />
+    <Copy SourceFiles="@(FabrCoreSkillSource)"
+          DestinationFiles="@(FabrCoreSkillSource->'%(DestinationPath)')" />
+    <ZipDirectory SourceDirectory="$(FabrCoreSkillStageRoot)%(FabrCoreSkillDirectory.SkillName)"
+                  DestinationFile="$(FabrCoreSkillPackageRoot)%(FabrCoreSkillDirectory.SkillName).zip"
+                  Overwrite="true" />
+  </Target>
+
+</Project>
