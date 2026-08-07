@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk.Web">
+﻿<Project Sdk="Microsoft.NET.Sdk.Web">
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
@@ -9,8 +9,8 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="FabrCore.Host" Version="1.6.4-local.20260806125929" />
-    <PackageReference Include="FabrCore.Surface" Version="1.6.4-local.20260806125929" GeneratePathProperty="true" />
+    <PackageReference Include="FabrCore.Host" Version="1.6.4-local.20260806162807" />
+    <PackageReference Include="FabrCore.Surface" Version="1.6.4-local.20260806162807" GeneratePathProperty="true" />
     <PackageReference Include="Microsoft.AspNetCore.App.Internal.Assets"
                       Version="$(AspNetCoreAssetsVersion)"
                       GeneratePathProperty="true"
