@@ -33,11 +33,15 @@ if ($currentBranch -ne 'main') {
 $confirm = Read-Host 'Tag and release? (y/n)'
 if ($confirm -ne 'y') { Write-Host 'Aborted.' -ForegroundColor Red; exit 0 }
 
-git pull origin main
-git tag $newTag
-git push origin $newTag
+git pull --ff-only origin main
 if ($LASTEXITCODE -ne 0) {
-    Write-Error "Failed to push tag $newTag. Remaining on main."
+    Write-Error 'Failed to update main.'
+    exit 1
+}
+
+& "$PSScriptRoot\Release-Signed.ps1" -Version $newTag -CreateTag -PublishRelease
+if (-not $?) {
+    Write-Error "Signed release $newTag failed. Remaining on main."
     exit 1
 }
 
@@ -49,4 +53,4 @@ if ($LASTEXITCODE -ne 0) {
 
 Write-Host "Tag $newTag pushed." -ForegroundColor Green
 Write-Host 'Switched to develop.' -ForegroundColor Green
-Write-Host 'The Release Windows workflow will build and publish the GitHub release assets.' -ForegroundColor Cyan
+Write-Host 'Signed GitHub release assets were produced and published locally.' -ForegroundColor Cyan
