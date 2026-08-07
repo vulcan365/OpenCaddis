@@ -37,7 +37,7 @@ public sealed class OpenCaddisServerHostTests
                 Assert.AreEqual(HttpStatusCode.OK, surfaceResponse.StatusCode);
                 var surfacePage = await surfaceResponse.Content.ReadAsStringAsync();
                 Assert.Contains("_framework/blazor.web.js", surfacePage);
-                Assert.Contains("surface-command-center", surfacePage);
+                Assert.Contains("surface-command-center-standalone", surfacePage);
 
                 using var surfaceCssResponse = await client.GetAsync("_content/FabrCore.Surface/surface.css");
                 Assert.AreEqual(HttpStatusCode.OK, surfaceCssResponse.StatusCode);

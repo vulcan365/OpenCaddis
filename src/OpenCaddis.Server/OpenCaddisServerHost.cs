@@ -150,6 +150,7 @@ public sealed class OpenCaddisServerHost : IOpenCaddisServerHost
             {
                 options.FabrCoreHostUrl = hostApiBaseUrl;
                 options.DevelopmentFallbackPrincipalId = "local-user";
+                options.CommandCenterLayoutMode = SurfaceCommandCenterLayoutMode.Standalone;
                 options.EnableAgentDirectory = true;
                 options.EnableAgentChat = true;
                 options.EnableLiveStatus = true;
