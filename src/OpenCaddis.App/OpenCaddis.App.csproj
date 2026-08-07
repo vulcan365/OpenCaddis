@@ -35,8 +35,8 @@
 		<ApplicationId>ai.opencaddis.app</ApplicationId>
 
 		<!-- Versions -->
-		<ApplicationDisplayVersion>0.6.1</ApplicationDisplayVersion>
-		<ApplicationVersion>6001</ApplicationVersion>
+		<ApplicationDisplayVersion>0.6.2</ApplicationDisplayVersion>
+		<ApplicationVersion>6002</ApplicationVersion>
 
 		<!-- To develop, package, and publish an app to the Microsoft Store, see: https://aka.ms/MauiTemplateUnpackaged -->
 		<WindowsPackageType>None</WindowsPackageType>

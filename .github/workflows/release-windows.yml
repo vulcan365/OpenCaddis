@@ -1,4 +1,4 @@
-name: Release Windows
+name: Validate Windows Release
 
 on:
   push:
@@ -6,7 +6,7 @@ on:
       - 'v*.*.*'
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: release-${{ github.ref }}
@@ -52,66 +52,8 @@ jobs:
         shell: pwsh
         run: dotnet test src/OpenCaddis.slnx -c Release --no-restore
 
-      - name: Publish the self-contained Windows app
-        id: package
+      - name: Confirm signed release handoff
         shell: pwsh
         run: |
-          $version = $env:GITHUB_REF_NAME.Substring(1)
-          $parts = $version.Split('.')
-          $applicationVersion = ([int]$parts[0] * 1000000) + ([int]$parts[1] * 1000) + [int]$parts[2]
-          $publishPath = Join-Path $env:RUNNER_TEMP 'opencaddis-publish'
-          $artifactPath = Join-Path $env:RUNNER_TEMP 'opencaddis-artifacts'
-          New-Item -ItemType Directory -Force -Path $publishPath, $artifactPath | Out-Null
-
-          dotnet publish src/OpenCaddis.App/OpenCaddis.App.csproj `
-            -c Release `
-            -f net10.0-windows10.0.19041.0 `
-            -r win-x64 `
-            --self-contained true `
-            -p:WindowsPackageType=None `
-            -p:WindowsAppSDKSelfContained=true `
-            -p:ApplicationDisplayVersion=$version `
-            -p:ApplicationVersion=$applicationVersion `
-            -p:Version=$version `
-            -p:InformationalVersion=$env:GITHUB_REF_NAME `
-            -o $publishPath
-          if ($LASTEXITCODE -ne 0) { throw 'dotnet publish failed.' }
-
-          $executable = Join-Path $publishPath 'OpenCaddis.App.exe'
-          if (-not (Test-Path -LiteralPath $executable -PathType Leaf)) {
-            throw "Expected executable was not published at '$executable'."
-          }
-
-          Set-Content -LiteralPath (Join-Path $publishPath 'version.txt') -Value $version -Encoding utf8NoBOM
-          $archivePath = Join-Path $artifactPath 'OpenCaddis-win-x64.zip'
-          Compress-Archive -Path (Join-Path $publishPath '*') -DestinationPath $archivePath -CompressionLevel Optimal
-
-          $hash = (Get-FileHash -LiteralPath $archivePath -Algorithm SHA256).Hash.ToLowerInvariant()
-          $checksumPath = "$archivePath.sha256"
-          Set-Content -LiteralPath $checksumPath -Value "$hash  OpenCaddis-win-x64.zip" -Encoding ascii
-
-          "artifact_path=$artifactPath" >> $env:GITHUB_OUTPUT
-
-      - name: Create or update the GitHub release
-        shell: pwsh
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          $tag = $env:GITHUB_REF_NAME
-          gh release view $tag --repo $env:GITHUB_REPOSITORY *> $null
-          if ($LASTEXITCODE -ne 0) {
-            gh release create $tag `
-              --repo $env:GITHUB_REPOSITORY `
-              --verify-tag `
-              --title $tag `
-              --generate-notes
-            if ($LASTEXITCODE -ne 0) { throw "Could not create release '$tag'." }
-          }
-
-          $artifactPath = '${{ steps.package.outputs.artifact_path }}'
-          gh release upload $tag `
-            (Join-Path $artifactPath 'OpenCaddis-win-x64.zip') `
-            (Join-Path $artifactPath 'OpenCaddis-win-x64.zip.sha256') `
-            --repo $env:GITHUB_REPOSITORY `
-            --clobber
-          if ($LASTEXITCODE -ne 0) { throw "Could not upload assets for '$tag'." }
+          Write-Host 'This workflow validates the tag only.'
+          Write-Host 'Signed release assets are produced and uploaded locally with scripts/Release-Signed.ps1.'
