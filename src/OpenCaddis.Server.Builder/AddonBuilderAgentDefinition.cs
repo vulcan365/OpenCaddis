@@ -39,7 +39,7 @@ public static class AddonBuilderAgentDefinition
         var skillReferences = harnessSkills ?? AddonBuilderSkillPackages.References;
         if (skillReferences.Count == 0)
         {
-            throw new ArgumentException("At least one FabrCore Harness Skill is required.", nameof(harnessSkills));
+            throw new ArgumentException("At least one Harness Skill is required.", nameof(harnessSkills));
         }
 
         return new AgentConfiguration

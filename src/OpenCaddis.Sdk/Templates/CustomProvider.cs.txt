@@ -1,0 +1,63 @@
+using OpenCaddis.Sdk.Addons;
+using OpenCaddis.Sdk.Connections;
+
+public sealed class ExampleCustomModule : IOpenCaddisAddonModule
+{
+    public void Configure(OpenCaddisAddonBuilder builder)
+    {
+        builder.SetIdentity("example.signed", "Example signed API", "1.0.0")
+            .AddConnectionProvider<ExampleSignedProvider>(ExampleSignedProvider.ProviderDescriptor)
+            .AddConnectionRequirement(new ConnectionRequirement
+            {
+                Id = "example.signed.invoke",
+                AddonId = "example.signed",
+                ProviderId = "example-signed",
+                DisplayName = "Invoke signed API",
+                Purpose = "Call the proprietary signed API.",
+                CredentialKind = ConnectionCredentialKind.Custom
+            });
+    }
+}
+
+public sealed class ExampleSignedProvider : IOpenCaddisConnectionProvider
+{
+    public static ConnectionProviderDescriptor ProviderDescriptor { get; } = new()
+    {
+        Id = "example-signed",
+        DisplayName = "Example signed API",
+        AuthenticationKind = ConnectionAuthenticationKind.Custom,
+        ConfigurationFields =
+        [
+            new ConnectionConfigurationField
+            {
+                Name = "signingKey", Label = "Signing key", Required = true,
+                Kind = ConnectionConfigurationFieldKind.Secret, Sensitive = true
+            }
+        ]
+    };
+
+    public ConnectionProviderDescriptor Descriptor => ProviderDescriptor;
+
+    public Task<IReadOnlyList<string>> ValidateConfigurationAsync(
+        ConnectionProviderContext context, CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<string>>([]);
+
+    public Task<ConnectionProviderResult> ConnectAsync(
+        ConnectionProviderContext context, IReadOnlyList<ConnectionRequirement> requirements,
+        CancellationToken cancellationToken = default) => Task.FromResult(new ConnectionProviderResult
+        {
+            Status = ConnectionStatus.Connected,
+            Message = "Signing key configured.",
+            GrantedRequirements = requirements.Select(requirement => requirement.Id).ToArray()
+        });
+
+    public Task<ConnectionCredentialResult> GetCredentialAsync(
+        ConnectionProviderContext context, ConnectionRequirement requirement,
+        CancellationToken cancellationToken = default) => Task.FromResult(
+            ConnectionCredentialResult.Granted(new ConnectionCredential(
+                ConnectionCredentialKind.Custom, context.GetRequiredSetting("signingKey"))));
+
+    public Task DisconnectAsync(
+        ConnectionProviderContext context, CancellationToken cancellationToken = default) =>
+        Task.CompletedTask;
+}

@@ -1,0 +1,4 @@
+interface:
+  display_name: "OpenCaddis Add-ons"
+  short_description: "Build connected OpenCaddis and FabrCore add-ons"
+  default_prompt: "Use $opencaddis to build a provider-neutral connected add-on for an OpenCaddis FabrCore agent."

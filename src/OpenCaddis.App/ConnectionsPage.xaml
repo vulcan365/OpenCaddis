@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage
+    x:Class="OpenCaddis.App.ConnectionsPage"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    Title="Connections">
+    <ScrollView>
+        <VerticalStackLayout Padding="24" Spacing="14" MaximumWidthRequest="920">
+            <Label Text="Connections" FontSize="28" FontAttributes="Bold" />
+            <Label Text="Configure credentials for add-ons and bind each connection to a FabrCore principal. Secrets are kept in the operating system secure store." />
+
+            <Border Padding="18">
+                <VerticalStackLayout Spacing="10">
+                    <Label Text="Create or edit" FontSize="20" FontAttributes="Bold" />
+                    <Picker x:Name="ProviderPicker" Title="Provider" SelectedIndexChanged="OnProviderChanged" />
+                    <Label x:Name="ProviderDescriptionLabel" TextColor="Gray" />
+                    <Entry x:Name="PrincipalEntry" Placeholder="Principal handle" Text="local-user" />
+                    <Entry x:Name="DisplayNameEntry" Placeholder="Connection name" />
+                    <VerticalStackLayout x:Name="ConfigurationFieldsLayout" Spacing="8" />
+                    <HorizontalStackLayout x:Name="ProviderActionsLayout" Spacing="8" />
+                    <Label Text="Capabilities to grant" FontAttributes="Bold" />
+                    <VerticalStackLayout x:Name="RequirementsLayout" Spacing="6" />
+                    <HorizontalStackLayout Spacing="8">
+                        <Button Text="Save" Clicked="OnSaveClicked" />
+                        <Button Text="Save and connect" Clicked="OnSaveAndConnectClicked" />
+                        <Button Text="Clear" Clicked="OnClearClicked" />
+                    </HorizontalStackLayout>
+                </VerticalStackLayout>
+            </Border>
+
+            <Border Padding="18">
+                <VerticalStackLayout Spacing="10">
+                    <Label Text="Existing connections" FontSize="20" FontAttributes="Bold" />
+                    <Picker x:Name="ConnectionPicker" Title="Select a connection" SelectedIndexChanged="OnConnectionChanged" />
+                    <Label x:Name="ConnectionStatusLabel" />
+                    <HorizontalStackLayout Spacing="8">
+                        <Button Text="Connect / grant" Clicked="OnConnectClicked" />
+                        <Button Text="Validate" Clicked="OnValidateClicked" />
+                        <Button Text="Disconnect" Clicked="OnDisconnectClicked" />
+                        <Button Text="Enable / disable" Clicked="OnToggleEnabledClicked" />
+                        <Button Text="Delete" Clicked="OnDeleteClicked" />
+                        <Button Text="Refresh" Clicked="OnRefreshClicked" />
+                    </HorizontalStackLayout>
+                </VerticalStackLayout>
+            </Border>
+
+            <Label x:Name="MessageLabel" TextColor="#B42318" LineBreakMode="WordWrap" />
+        </VerticalStackLayout>
+    </ScrollView>
+</ContentPage>

@@ -20,7 +20,7 @@ Write-Host "Current: $lastTag"
 Write-Host "New:     $newTag"
 
 if ($DryRun) {
-    Write-Host "[DryRun] Would create and push tag $newTag." -ForegroundColor Yellow
+    Write-Host "[DryRun] Would create and push tag $newTag, then switch to develop." -ForegroundColor Yellow
     exit 0
 }
 
@@ -37,7 +37,17 @@ if ($confirm -ne 'y') { Write-Host 'Aborted.' -ForegroundColor Red; exit 0 }
 git pull origin main
 git tag $newTag
 git push origin $newTag
+if ($LASTEXITCODE -ne 0) {
+    Write-Error "Failed to push tag $newTag. Remaining on main."
+    exit 1
+}
+
+git switch develop
+if ($LASTEXITCODE -ne 0) {
+    Write-Error "Tag $newTag was pushed, but switching to develop failed."
+    exit 1
+}
 
 Write-Host "Tag $newTag pushed." -ForegroundColor Green
-Write-Host 'Create the release notes at:' -ForegroundColor Cyan
-Write-Host "  https://github.com/vulcan365/OpenCaddis/releases/new?tag=$newTag" -ForegroundColor Cyan
+Write-Host 'Switched to develop.' -ForegroundColor Green
+Write-Host 'The Release Windows workflow will build and publish the GitHub release assets.' -ForegroundColor Cyan

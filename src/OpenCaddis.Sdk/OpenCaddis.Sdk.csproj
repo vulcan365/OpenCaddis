@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+    <PackageId>OpenCaddis.Sdk</PackageId>
+    <PackageVersion>1.0.0-preview.1</PackageVersion>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <Description>Contracts and developer tooling for OpenCaddis add-ons and connections.</Description>
+    <Authors>OpenCaddis</Authors>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="FabrCore.Sdk" Version="1.6.4-local.20260806162807" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.10" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="Templates\**\*" Pack="true" PackagePath="templates\" />
+    <None Include="Templates\README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+</Project>

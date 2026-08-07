@@ -5,6 +5,7 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <FabrCoreSkillSourceRoot>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)..\..\.agents\skills\'))</FabrCoreSkillSourceRoot>
+    <OpenCaddisSkillSourceRoot>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)..\..\docs\skills\'))</OpenCaddisSkillSourceRoot>
     <FabrCoreSkillStageRoot>$(MSBuildThisFileDirectory)obj\$(Configuration)\$(TargetFramework)\fabrcore-skills\stage\</FabrCoreSkillStageRoot>
     <FabrCoreSkillPackageRoot>$(MSBuildThisFileDirectory)AgentSkills\</FabrCoreSkillPackageRoot>
   </PropertyGroup>
@@ -19,18 +20,24 @@
 
   <ItemGroup>
     <ProjectReference Include="..\OpenCaddis.Server\OpenCaddis.Server.csproj" />
+    <ProjectReference Include="..\OpenCaddis.Sdk\OpenCaddis.Sdk.csproj" PrivateAssets="all" />
+    <Content Include="..\OpenCaddis.Sdk\bin\$(Configuration)\OpenCaddis.Sdk.1.0.0-preview.1.nupkg"
+             Link="SdkPackages\OpenCaddis.Sdk.1.0.0-preview.1.nupkg"
+             CopyToOutputDirectory="PreserveNewest"
+             CopyToPublishDirectory="PreserveNewest"
+             Visible="false" />
   </ItemGroup>
 
   <ItemGroup>
     <InternalsVisibleTo Include="OpenCaddis.Server.Tests" />
-    <EmbeddedResource Include="AgentSkills\fabrcore*.zip">
+    <EmbeddedResource Include="AgentSkills\*.zip">
       <LogicalName>OpenCaddis.Server.Builder.AgentSkills/%(Filename)%(Extension)</LogicalName>
     </EmbeddedResource>
   </ItemGroup>
 
   <!--
-    FabrCore Harness Skill packages are immutable ZIPs. Package the repository's
-    fabrcore* skills independently and embed them so the desktop app does not need
+    Agent Skill packages are immutable ZIPs. Package the repository's FabrCore and
+    OpenCaddis skills independently and embed them so the desktop app does not need
     access to the source checkout at runtime. FabrCore skill V1 accepts text
     resources only and limits resources to two directories below SKILL.md.
   -->
@@ -38,20 +45,31 @@
     <FabrCoreSkillDirectory Include="$(FabrCoreSkillSourceRoot)fabrcore*\SKILL.md">
       <SkillName>$([System.IO.Path]::GetFileName($([System.IO.Path]::GetDirectoryName('%(FullPath)'))))</SkillName>
     </FabrCoreSkillDirectory>
+    <OpenCaddisSkillDirectory Include="$(OpenCaddisSkillSourceRoot)opencaddis\SKILL.md">
+      <SkillName>$([System.IO.Path]::GetFileName($([System.IO.Path]::GetDirectoryName('%(FullPath)'))))</SkillName>
+    </OpenCaddisSkillDirectory>
     <FabrCoreSkillSource Include="$(FabrCoreSkillSourceRoot)fabrcore*\**\*.md;$(FabrCoreSkillSourceRoot)fabrcore*\**\*.json;$(FabrCoreSkillSourceRoot)fabrcore*\**\*.yaml;$(FabrCoreSkillSourceRoot)fabrcore*\**\*.yml;$(FabrCoreSkillSourceRoot)fabrcore*\**\*.csv;$(FabrCoreSkillSourceRoot)fabrcore*\**\*.xml;$(FabrCoreSkillSourceRoot)fabrcore*\**\*.txt"
                           Exclude="$(FabrCoreSkillSourceRoot)fabrcore-harness\assets\policy-review\**\*">
       <DestinationPath>$([System.String]::Copy('%(FullPath)').Replace('$(FabrCoreSkillSourceRoot)', '$(FabrCoreSkillStageRoot)'))</DestinationPath>
     </FabrCoreSkillSource>
+    <OpenCaddisSkillSource Include="$(OpenCaddisSkillSourceRoot)opencaddis\**\*.md;$(OpenCaddisSkillSourceRoot)opencaddis\**\*.json;$(OpenCaddisSkillSourceRoot)opencaddis\**\*.yaml;$(OpenCaddisSkillSourceRoot)opencaddis\**\*.yml;$(OpenCaddisSkillSourceRoot)opencaddis\**\*.csv;$(OpenCaddisSkillSourceRoot)opencaddis\**\*.xml;$(OpenCaddisSkillSourceRoot)opencaddis\**\*.txt">
+      <DestinationPath>$([System.String]::Copy('%(FullPath)').Replace('$(OpenCaddisSkillSourceRoot)', '$(FabrCoreSkillStageRoot)'))</DestinationPath>
+    </OpenCaddisSkillSource>
   </ItemGroup>
 
-  <!-- Run `dotnet msbuild -t:PackageFabrCoreAgentSkills` to refresh the checked-in packages. -->
+  <!-- Run `dotnet msbuild -t:PackageFabrCoreAgentSkills` to refresh the checked-in Agent Skill packages. -->
   <Target Name="PackageFabrCoreAgentSkills">
     <RemoveDir Directories="$(FabrCoreSkillStageRoot);$(FabrCoreSkillPackageRoot)" />
     <MakeDir Directories="$(FabrCoreSkillStageRoot);$(FabrCoreSkillPackageRoot)" />
     <Copy SourceFiles="@(FabrCoreSkillSource)"
           DestinationFiles="@(FabrCoreSkillSource->'%(DestinationPath)')" />
+    <Copy SourceFiles="@(OpenCaddisSkillSource)"
+          DestinationFiles="@(OpenCaddisSkillSource->'%(DestinationPath)')" />
     <ZipDirectory SourceDirectory="$(FabrCoreSkillStageRoot)%(FabrCoreSkillDirectory.SkillName)"
                   DestinationFile="$(FabrCoreSkillPackageRoot)%(FabrCoreSkillDirectory.SkillName).zip"
+                  Overwrite="true" />
+    <ZipDirectory SourceDirectory="$(FabrCoreSkillStageRoot)%(OpenCaddisSkillDirectory.SkillName)"
+                  DestinationFile="$(FabrCoreSkillPackageRoot)%(OpenCaddisSkillDirectory.SkillName).zip"
                   Overwrite="true" />
   </Target>
 

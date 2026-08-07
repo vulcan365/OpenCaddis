@@ -22,6 +22,25 @@ namespace OpenCaddis.App
                 services.GetRequiredService<OpenCaddis.Server.OpenCaddisCloudConfigurationStore>()));
             builder.Services.AddSingleton<Services.ServerController>();
             builder.Services.AddSingleton<HttpClient>();
+            builder.Services.AddSingleton<OpenCaddis.Sdk.Connections.IOpenCaddisSecretStore, Services.MauiSecretStore>();
+            builder.Services.AddSingleton<OpenCaddis.Sdk.Connections.IOpenCaddisInteractiveBrowser, Services.MauiInteractiveBrowser>();
+            builder.Services.AddSingleton<Services.MicrosoftConnectionProvider>();
+            builder.Services.AddSingleton(services =>
+            {
+                var runtime = new OpenCaddis.Server.Connections.OpenCaddisConnectionRuntime(
+                    Path.Combine(FileSystem.Current.AppDataDirectory, "Connections"),
+                    services.GetRequiredService<OpenCaddis.Sdk.Connections.IOpenCaddisSecretStore>(),
+                    services.GetRequiredService<OpenCaddis.Sdk.Connections.IOpenCaddisInteractiveBrowser>(),
+                    services,
+                    services.GetRequiredService<HttpClient>());
+                runtime.RegisterBuiltInProvider(
+                    services.GetRequiredService<Services.MicrosoftConnectionProvider>(),
+                    services,
+                    "opencaddis.microsoft");
+                return runtime;
+            });
+            builder.Services.AddSingleton<OpenCaddis.Sdk.Connections.IOpenCaddisConnectionAdministration>(services =>
+                services.GetRequiredService<OpenCaddis.Server.Connections.OpenCaddisConnectionRuntime>());
             builder.Services.AddSingleton<OpenCaddis.Server.OpenCaddisAgentRegistryService>();
             builder.Services.AddSingleton<OpenCaddis.Server.Builder.BuilderWorkspaceService>();
             builder.Services.AddSingleton<OpenCaddis.Server.Builder.AddonBuilderAgentProvisioner>();
@@ -29,6 +48,7 @@ namespace OpenCaddis.App
             builder.Services.AddSingleton<ServerPage>();
             builder.Services.AddSingleton<BuilderPage>();
             builder.Services.AddSingleton<SurfacePage>();
+            builder.Services.AddSingleton<ConnectionsPage>();
             builder.Services.AddSingleton<AppShell>();
 
 #if DEBUG

@@ -7,7 +7,8 @@ namespace OpenCaddis.Server.Builder;
 
 public sealed class BuilderWorkspaceService
 {
-    public const string FabrCoreSdkVersion = "1.6.3";
+    public const string FabrCoreSdkVersion = "1.6.4-local.20260806162807";
+    public const string OpenCaddisSdkVersion = "1.0.0-preview.1";
 
     private readonly SemaphoreSlim commandLock = new(1, 1);
 
@@ -165,6 +166,27 @@ public sealed class BuilderWorkspaceService
                 ],
                 cancellationToken);
             AppendOutput(output, packageResult);
+
+            var openCaddisPackageArguments = new List<string>
+            {
+                "add", projectFilePath,
+                "package", "OpenCaddis.Sdk",
+                "--version", OpenCaddisSdkVersion
+            };
+            var bundledSdkDirectory = Path.Combine(AppContext.BaseDirectory, "SdkPackages");
+            if (File.Exists(Path.Combine(
+                    bundledSdkDirectory,
+                    $"OpenCaddis.Sdk.{OpenCaddisSdkVersion}.nupkg")))
+            {
+                openCaddisPackageArguments.Add("--source");
+                openCaddisPackageArguments.Add(bundledSdkDirectory);
+            }
+
+            var openCaddisPackageResult = await RunDotNetAsync(
+                fullPath,
+                openCaddisPackageArguments,
+                cancellationToken);
+            AppendOutput(output, openCaddisPackageResult);
 
             var solutionResult = await RunDotNetAsync(
                 fullPath,
